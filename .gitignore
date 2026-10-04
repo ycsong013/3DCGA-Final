@@ -1,0 +1,5 @@
+# Build output
+out
+
+# IDE files
+.vs/
