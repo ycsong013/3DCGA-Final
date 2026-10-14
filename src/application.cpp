@@ -1,6 +1,8 @@
 //#include "Image.h"
 #include "mesh.h"
 #include "texture.h"
+#include "boat.h"
+#include "sea.h"
 // Always include window first (because it includes glfw, which includes GL which needs to be included AFTER glew).
 // Can't wait for modules to fix this stuff...
 #include <framework/disable_all_warnings.h>
@@ -41,7 +43,9 @@ public:
                 onMouseReleased(button, mods);
         });
 
-        m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
+        //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
+        m_meshes.push_back(makeUnitBox());  
+        m_meshes.push_back(makeGrid(100, 200));
 
         try {
             ShaderBuilder defaultBuilder;
@@ -77,6 +81,9 @@ public:
             ImGui::InputInt("This is an integer input", &dummyInteger); // Use ImGui::DragInt or ImGui::DragFloat for larger range of numbers.
             ImGui::Text("Value is: %i", dummyInteger); // Use C printf formatting rules (%i is a signed integer)
             ImGui::Checkbox("Use material if no texture", &m_useMaterial);
+            ImGui::Checkbox("Wireframe", &m_wireframe);
+            const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
+            ImGui::Combo("Camera Mode", &m_cameraMode, cameraModes, IM_ARRAYSIZE(cameraModes));
             ImGui::End();
 
             // Clear the screen
@@ -85,6 +92,24 @@ public:
 
             // ...
             glEnable(GL_DEPTH_TEST);
+
+            if (m_wireframe) {
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);  // // Set wireframe before draws
+            }
+
+            switch (m_cameraMode) {
+                case Aerial:
+                    m_viewMatrix = glm::lookAt(glm::vec3(10, 10, 10), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+                    break;
+                case Top:
+                    m_viewMatrix = glm::lookAt(glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
+                    break;
+                case Third:
+                    m_viewMatrix = glm::lookAt(glm::vec3(0, 1, 3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+                    break;
+                default:
+                    break;
+            }
 
             const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
             // Normals should be transformed differently than positions (ignoring translations + dealing with scaling):
@@ -108,6 +133,8 @@ public:
                 }
                 mesh.draw(m_defaultShader);
             }
+
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
 
             // Processes input and swaps the window buffer
             m_window.swapBuffers();
@@ -155,6 +182,11 @@ public:
 private:
     Window m_window;
 
+    // Tools for debugging
+    bool m_wireframe = false;
+    enum CameraMode { Aerial = 0, Top = 1, Third = 2 };
+    int m_cameraMode = Aerial;
+
     // Shader for default rendering and for depth rendering
     Shader m_defaultShader;
     Shader m_shadowShader;
@@ -165,7 +197,7 @@ private:
 
     // Projection and view matrices for you to fill in and use
     glm::mat4 m_projectionMatrix = glm::perspective(glm::radians(80.0f), 1.0f, 0.1f, 30.0f);
-    glm::mat4 m_viewMatrix = glm::lookAt(glm::vec3(-1, 1, -1), glm::vec3(0), glm::vec3(0, 1, 0));
+    glm::mat4 m_viewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0), glm::vec3(0, 1, 0));
     glm::mat4 m_modelMatrix { 1.0f };
 };
 
