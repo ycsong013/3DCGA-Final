@@ -20,6 +20,7 @@ uniform vec3 lightPosition;
 uniform vec3 cameraPosition;
 uniform vec3 lightColor;
 uniform int useIBL; // If we use IBL or not (environment mapping)
+uniform int usePBR;
 
 // Texture-based information
 uniform sampler2D textureAlbedo;
@@ -80,13 +81,16 @@ void main()
 
     if (hasTexCoords)       { 
 
-        // fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
+        if (usePBR == 0) {
+        fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
+        }
+        else {
         // Albedos found online are usually given the sRGB space. To convert
         // them to the linear space, LearnOpenGL mentioned that we need to take its power to 2.2.
         vec3 albedo = pow(texture(textureAlbedo, fragTexCoord).rgb, vec3(2.2));
         // normal = normalize(texture(textureNormal, fragTexCoord).xyz); // Note to Yamaç: This will NOT give you the normal yet. Check the normal mapping lecture.
         float metallic = texture(textureMetallic, fragTexCoord).x;
-        float roughness = texture(textureRougness, fragTexCoord).x; 
+        float roughness = texture(textureRoughness, fragTexCoord).x; 
         float ambientOcclusion = texture(textureAO, fragTexCoord).x;
 
         vec3 fragToLight = normalize(lightPosition - fragPosition);
@@ -113,7 +117,7 @@ void main()
         vec3 outgoingRadiance = (kd * (albedo / pi) + ((ndf * geometry * F0) / (4 * max(dot(normal, fragToCamera), 0.0) * cosTheta + 0.0001))) * lightRadiance * cosTheta;
 
         vec3 ambient = vec3(0.03) * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
-        vec3 color = ambient + outGoingRadiance;
+        vec3 color = ambient + outgoingRadiance;
 
         // Finally, implement gamma correcting for more realistic colors to the eye:
 
@@ -121,9 +125,7 @@ void main()
         color = pow(color, vec3(1.0/2.2));
 
         fragColor = vec4(color, 1.0);
-
-
-
+        }
 
     }
     else if (useMaterial)   { fragColor = vec4(kd, 1);}
