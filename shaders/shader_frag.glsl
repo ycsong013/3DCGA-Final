@@ -103,18 +103,18 @@ void main()
         vec3 F0 = vec3(0.04); // LearnOpenGL mentions that we can approximate the F0 of dielectric materials as a vector of 0.4s.
         F0 = mix(F0, albedo, metallic); // For metallic surfaces, the F0 value is changed using linear interpolation.
 
-        vec3 ks = fresnel(halfwayVector, fragToCamera, F0); // Fraction of specular light (reflections)
-        vec3 kd = vec3(1.0) - ks; // Fraction of diffuse light (refractions)
+        vec3 kS = fresnel(halfwayVector, fragToCamera, F0); // Fraction of specular light (reflections)
+        vec3 kD = vec3(1.0) - kS; // Fraction of diffuse light (refractions)
 
         // According to LearnOpenGL, we need to enforce no diffusion in metallic surfaces, so we need to modify kd with this equation:
-        kd *= (1-metallic);
+        kD *= (1-metallic);
         
         // Calculate the rest of the function values
         float ndf = NDF(pi, roughness, normal, halfwayVector);
         float geometry = geometryFunction(roughness, normal, fragToCamera, fragToLight);
         float cosTheta = max(dot(fragToLight, normal), 0.0);
         // LearnOpenGL advises to add a 0.0001 to the denominator to ensure no divisions by zero
-        vec3 outgoingRadiance = (kd * (albedo / pi) + ((ndf * geometry * F0) / (4 * max(dot(normal, fragToCamera), 0.0) * cosTheta + 0.0001))) * lightRadiance * cosTheta;
+        vec3 outgoingRadiance = (kD * (albedo / pi) + ((ndf * geometry * kS) / (4 * max(dot(normal, fragToCamera), 0.0) * cosTheta + 0.0001))) * lightRadiance * cosTheta;
 
         vec3 ambient = vec3(0.03) * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
         vec3 color = ambient + outgoingRadiance;
