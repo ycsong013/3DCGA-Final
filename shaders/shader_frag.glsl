@@ -57,7 +57,7 @@ float geometryFunction(float roughness, vec3 normal, vec3 fragToCamera, vec3 fra
     }
 
     float normalDotFragToCamera = max(dot(normal, fragToCamera), 0.0);
-    float normalDotFragToLight = max(dot(normal, fragToLight), 0.0)
+    float normalDotFragToLight = max(dot(normal, fragToLight), 0.0);
     float g_nvk = normalDotFragToCamera / ((normalDotFragToCamera) * (1 - k) + k);
     float g_nlk = normalDotFragToLight / ((normalDotFragToLight) * (1 - k) + k);
 
