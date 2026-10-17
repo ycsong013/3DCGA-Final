@@ -128,6 +128,8 @@ void Environment::createCubeMap()
     // From this point on (as we initialized the environment, the HDR turned into the cube map, and "m_cubemap" has this information.)
 
     glViewport(0, 0, 1024, 1024); // Reset back to the previous size of the viewport.
+    glDeleteFramebuffers(1, &frameBuffer);
+    glDeleteRenderbuffers(1, &renderBuffer);
 }
 
 // The matrices here need to come from the MVP! There is no model matrix needed because the cube is all around the scene.

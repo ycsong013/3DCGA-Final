@@ -22,12 +22,14 @@ DISABLE_WARNINGS_POP()
 #include <functional>
 #include <iostream>
 #include <vector>
+#include "environment.h"
 
 class Application {
 public:
     Application()
         : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
-        , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
+        , m_texture(RESOURCE_ROOT "resources/checkerboard.png"),
+        m_environment(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
     {
         glDepthFunc(GL_LEQUAL); // Updated to ensure that the skybox is always outside.
         m_window.registerKeyCallback([this](int key, int scancode, int action, int mods) {
@@ -136,6 +138,7 @@ public:
             }
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
+            m_environment.drawSkyBox(m_projectionMatrix, m_viewMatrix);
 
             // Processes input and swaps the window buffer
             m_window.swapBuffers();
@@ -194,6 +197,7 @@ private:
 
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;
+    Environment m_environment;
     bool m_useMaterial { true };
 
     // Projection and view matrices for you to fill in and use

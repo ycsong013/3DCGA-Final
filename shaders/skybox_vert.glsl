@@ -14,7 +14,7 @@ out vec3 fragPosition;
 void main() 
 {
     mat4 newViewMatrix = mat4(mat3(viewMatrix)); // The skybox should look infinitely far away, so the translation part of the matrix is removed, the sky should not move if the camera moves.
-    gl_Position = projectionMatrix * newViewMatrix * vec4(position, 1.0).xyww; // This is another depth trick, discussed by LearnOpenGL
+    gl_Position = (projectionMatrix * newViewMatrix * vec4(position, 1.0)).xyww; // This is another depth trick, discussed by LearnOpenGL
     fragPosition = position;
 
 }
