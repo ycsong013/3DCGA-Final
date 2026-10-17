@@ -4,7 +4,7 @@
 uniform mat4 projectionMatrix;
 uniform mat4 viewMatrix;
 
-layout(location == 0) in vec3 position;
+layout(location = 0) in vec3 position;
 
 out vec3 fragPosition;
 
