@@ -43,6 +43,12 @@ Environment::Environment(std::filesystem::path filePath)
         stbi_image_free(data);
         stbi_set_flip_vertically_on_load(false);
         createCubeMap();
+        ShaderBuilder skyboxShaderBuilder;
+
+        // Prepare the skybox shader for whenever we need to create the skybox.
+        skyboxShaderBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/skybox_vert.glsl");
+        skyboxShaderBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/skybox_frag.glsl");
+        m_skyboxShader = skyboxShaderBuilder.build();
     }
     else
     {
@@ -121,6 +127,17 @@ void Environment::createCubeMap()
 
     // From this point on (as we initialized the environment, the HDR turned into the cube map, and "m_cubemap" has this information.)
 
+    glViewport(0, 0, 1024, 1024); // Reset back to the previous size of the viewport.
+}
+
+// The matrices here need to come from the MVP! There is no model matrix needed because the cube is all around the scene.
+void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix) {
+    m_skyboxShader.bind();
+    glUniformMatrix4fv(m_skyboxShader.getUniformLocation("viewMatrix"), 1, GL_FALSE, glm::value_ptr(viewMatrix));
+    glUniformMatrix4fv(m_skyboxShader.getUniformLocation("projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+    bindCubeMap(GL_TEXTURE0);
+    glUniform1i(m_skyboxShader.getUniformLocation("skyboxMap"), 0);
+    renderCube();
 }
 
 Environment::Environment(Environment&& other)

@@ -21,12 +21,14 @@ public:
 
     void bind(GLint environmentSlot);
     void bindCubeMap(GLint cubeMapSlot);
+    void drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix);
 
 private:
     static constexpr GLuint INVALID = 0xFFFFFFFF;
     GLuint m_environment { INVALID };
     GLuint m_cubemap {INVALID};
     Shader m_hdrToCubeConverterShader; // Shader used to convert the HDR map into a cube.
+    Shader m_skyboxShader; // Shader to render the environment map
     void createCubeMap();
     void renderCube();
     GLuint cubeVertexBuffer = 0;
