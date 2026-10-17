@@ -29,6 +29,7 @@ public:
         : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
         , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
     {
+        glDepthFunc(GL_LEQUAL); // Updated to ensure that the skybox is always outside.
         m_window.registerKeyCallback([this](int key, int scancode, int action, int mods) {
             if (action == GLFW_PRESS)
                 onKeyPressed(key, mods);
