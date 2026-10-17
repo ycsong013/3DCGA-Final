@@ -13,6 +13,10 @@ DISABLE_WARNINGS_POP()
 
 // Like the "Texture" class used to load textures, we use this environment class
 // to load environment maps, including the HDR loading logic. 
+// The class creates a skybox from a given environment map -> This conversion is done
+// only once in the constructor. Later, the skybox has to be updated whenever the view
+// changes, which is why there is an available "drawSkybox" function
+// for the main application code to call.
 // To understand how environment maps work, we used the LearnOpenGL tutorial:
 // https://learnopengl.com/PBR/IBL/Diffuse-irradiance.
 
