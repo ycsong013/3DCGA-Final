@@ -15,6 +15,7 @@ add_executable(Master_TechDemo
 	"src/mesh.cpp"
 	"src/boat.cpp"
 	"src/sea.cpp"
+	"src/environment.cpp"
 	"src/bezier.cpp"
 )
 
