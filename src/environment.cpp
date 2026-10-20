@@ -46,7 +46,31 @@ Environment::Environment(std::filesystem::path filePath)
 
         stbi_image_free(data);
         stbi_set_flip_vertically_on_load(false);
-        createCubeMap();
+
+        GLuint frameBuffer;
+        GLuint renderBuffer;
+        glGenFramebuffers(1, &frameBuffer);
+        glGenRenderbuffers(1, &renderBuffer);
+
+        // These values below, as they are specific to the cube creation, have been copied and pasted from LearnOpenGL's tutorial above.
+
+        glm::mat4 projectionMatrix = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+        glm::mat4 viewMatrices[] = 
+        {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+        };
+
+        createCubeMap(frameBuffer, renderBuffer, projectionMatrix, viewMatrices);
+        createIrradianceMap(frameBuffer, renderBuffer, projectionMatrix, viewMatrices);
+        glViewport(0, 0, 1024, 1024); // Reset back to the previous size of the viewport, as the cubemap and irradiance map will change the viewport.
+        glDeleteFramebuffers(1, &frameBuffer);
+        glDeleteRenderbuffers(1, &renderBuffer);
+
         ShaderBuilder skyboxShaderBuilder;
 
         // Prepare the skybox shader for whenever we need to create the skybox.
@@ -60,7 +84,7 @@ Environment::Environment(std::filesystem::path filePath)
     }
 }
 
-void Environment::createCubeMap()
+void Environment::createCubeMap(GLuint frameBuffer, GLuint renderBuffer, glm::mat4 projectionMatrix, glm::mat4 viewMatrices[])
 {
     ShaderBuilder hdrToCubeConverterBuilder;
     hdrToCubeConverterBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/cube_vert.glsl");
@@ -68,11 +92,6 @@ void Environment::createCubeMap()
     m_hdrToCubeConverterShader = hdrToCubeConverterBuilder.build();
 
     // Create the frame and render bufferers
-    GLuint frameBuffer;
-    GLuint renderBuffer;
-
-    glGenFramebuffers(1, &frameBuffer);
-    glGenRenderbuffers(1, &renderBuffer);
 
     glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
     glBindRenderbuffer(GL_RENDERBUFFER, renderBuffer);
@@ -94,19 +113,6 @@ void Environment::createCubeMap()
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // These values below, as they are specific to the cube creation, have been copied and pasted from LearnOpenGL's tutorial above.
-
-    glm::mat4 projectionMatrix = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-    glm::mat4 viewMatrices[] = 
-    {
-    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
-    };
 
     // The rest of this code is again written on our own without looking at the tutorial.
 
@@ -130,10 +136,57 @@ void Environment::createCubeMap()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // From this point on (as we initialized the environment, the HDR turned into the cube map, and "m_cubemap" has this information.)
+}
 
-    glViewport(0, 0, 1024, 1024); // Reset back to the previous size of the viewport.
-    glDeleteFramebuffers(1, &frameBuffer);
-    glDeleteRenderbuffers(1, &renderBuffer);
+void Environment::createIrradianceMap(GLuint frameBuffer, GLuint renderBuffer, glm::mat4 projectionMatrix, glm::mat4 viewMatrices[]) {
+    ShaderBuilder convolutionBuilder;
+    convolutionBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/cube_vert.glsl");
+    convolutionBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/cubemap_conv_frag.glsl");
+    m_convolutionShader = convolutionBuilder.build();
+
+    glGenTextures(1, &m_irradiencemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradiencemap);
+
+    // This part is the same as generating the cube map.
+    for (int i = 0; i < 6; i++) { // Generate a texture for each of the 6 faces of the cubemap, this time with a 32x32 resolution, as LearnOpenGL advises.
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, NULL);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, renderBuffer);
+
+    // Bind the render buffer to the frame buffer
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32); // LearnOpenGL suggests that diffuse irradiance does not hold a lot of
+    // information, which is why they advise a 32x32 resolution.
+
+    m_convolutionShader.bind();
+    glUniformMatrix4fv(m_convolutionShader.getUniformLocation("projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+    bindCubeMap(GL_TEXTURE0); // Bind the cube map to slot 0
+    glUniform1i(m_convolutionShader.getUniformLocation("skyboxMap"), 0); // Pass slot 0 as samplerCube.
+    
+    glViewport(0, 0, 32, 32); // Configure the viewport
+
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+
+    for (int i = 0; i < 6; i++) {
+        glUniformMatrix4fv(m_convolutionShader.getUniformLocation("viewMatrix"), 1, GL_FALSE, glm::value_ptr(viewMatrices[i]));
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_irradiencemap, 0); // Load the irradiance map texture to the frame buffer.
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the color buffer and the depth buffer, so empty the frame buffer's content.
+
+        renderCube();
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+
 }
 
 // The matrices here need to come from the MVP! There is no model matrix needed because the cube is all around the scene.
@@ -174,6 +227,12 @@ void Environment::bindCubeMap(GLint cubeMapSlot)
 {
     glActiveTexture(cubeMapSlot);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubemap);
+}
+
+void Environment::bindIrradianceMap(GLint irradianceMapSlot)
+{
+    glActiveTexture(irradianceMapSlot);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradiencemap);
 }
 
 void Environment::renderCube() 
