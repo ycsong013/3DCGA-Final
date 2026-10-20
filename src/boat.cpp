@@ -21,11 +21,12 @@ DISABLE_WARNINGS_POP()
 
 const glm::mat4 idt = glm::mat4(1.0f); // identity matrix
 
-void buildBoat(Node& root, GPUMesh& hullMesh, GPUMesh& boxMesh) {
+void buildBoat(Node& root, GPUMesh& hullMesh, GPUMesh& boxMesh, PBRMaterial& boatMaterial) {
     root.transform = glm::translate(idt, glm::vec3(0.0f, 0.0f, 0.0f));
 
     Node* hull = root.addChild();
     hull->mesh = &hullMesh;
+    hull->m_material = &boatMaterial;
 
     Node* mast = hull->addChild();
     mast->transform = glm::translate(idt, glm::vec3(0.0f, 1.0f, -0.5f));
@@ -39,6 +40,7 @@ void buildBoat(Node& root, GPUMesh& hullMesh, GPUMesh& boxMesh) {
     boom->mesh = &boxMesh;
     boom->meshTransform = glm::translate(idt, glm::vec3(0.0f, 0.0f, 0.75f))
         * glm::scale(idt, glm::vec3(0.1f, 0.1f, 1.5f));
+    
 }
 
 // The verteces should follow a counter-clockwise order

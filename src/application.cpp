@@ -51,7 +51,7 @@ public:
 
         //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
         m_meshes.push_back(makeGrid(100, 200));
-        buildBoat(m_boatRoot, m_hullMesh, m_boxMesh);
+        buildBoat(m_boatRoot, m_hullMesh, m_boxMesh, m_goldMaterial);
 
         m_path.build(glm::vec3(-5.0f, 0.0f, -5.0f),   // start of the linear bezier
                      glm::vec3(5.0f, 0.0f, -5.0f),    // end of the linear bezier / start of the quadratic bezier
@@ -262,7 +262,9 @@ private:
     GPUMesh m_boxMesh;
     Node m_boatRoot;
 
-    void drawMesh(GPUMesh& mesh, const glm::mat4& model) {
+    PBRMaterial m_goldMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/bamboo-wood-semigloss-bl/bamboo-wood-semigloss-");
+
+    void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
         // Normals should be transformed differently than positions (ignoring translations + dealing with scaling):
@@ -274,7 +276,29 @@ private:
         //Uncomment this line when you use the modelMatrix (or fragmentPosition)
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-        if (mesh.hasTextureCoords()) {
+        m_environment.bindIrradianceMap(GL_TEXTURE1);
+        glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
+        glUniform1i(m_defaultShader.getUniformLocation("useIBL"), 1);
+        glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(glm::vec3(3.0f, 5.0f, 3.0f)));
+        glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
+        glUniform3fv(m_defaultShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(glm::vec3(glm::inverse(m_viewMatrix)[3])));
+        if (material != nullptr) {
+            GLint textureSlots[] = {
+                GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6
+            };
+            material->bind(textureSlots);
+            glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_TRUE);
+            // Is there an easier way of doing this??? Check.
+            glUniform1i(m_defaultShader.getUniformLocation("usePBR"), 1);
+            glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), GL_FALSE);
+            glUniform1i(m_defaultShader.getUniformLocation("textureAlbedo"), 2);
+            glUniform1i(m_defaultShader.getUniformLocation("textureAO"), 3);
+            glUniform1i(m_defaultShader.getUniformLocation("textureMetallic"), 4);
+            glUniform1i(m_defaultShader.getUniformLocation("textureNormal"), 5);
+            glUniform1i(m_defaultShader.getUniformLocation("textureRoughness"), 6);
+
+        }
+        else if (mesh.hasTextureCoords()) {
             m_texture.bind(GL_TEXTURE0);
             glUniform1i(m_defaultShader.getUniformLocation("colorMap"), 0);
             glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_TRUE);
@@ -291,7 +315,7 @@ private:
         glm::mat4 world = parentWorld * node.transform;
 
         if (node.mesh) {
-            drawMesh(*node.mesh, world * node.meshTransform);
+            drawMesh(*node.mesh, world * node.meshTransform, node.m_material);
         }
 
         for (const auto& child : node.children) {

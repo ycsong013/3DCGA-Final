@@ -10,21 +10,21 @@ DISABLE_WARNINGS_POP()
 #include <iostream>
 
 PBRMaterial::PBRMaterial(std::string filePath) 
-: m_albedo(filePath + "_albedo.png"),
-m_ao(filePath + "_ao.png"),
-m_metallic(filePath + "_metallic.png"),
-m_normal(filePath + "_normal-ogl.png"),
-m_roughness(filePath + "_roughness.png")
+: m_albedo(filePath + "albedo.png"),
+m_ao(filePath + "ao.png"),
+m_metallic(filePath + "metallic.png"),
+m_normal(filePath + "normal-ogl.png"),
+m_roughness(filePath + "roughness.png")
 {
     glm::vec3 hey = glm::vec3(1.0f);
 }
 
 PBRMaterial::PBRMaterial(PBRMaterial&& other) noexcept
     : m_albedo(std::move(other.m_albedo)),
-    m_ao(std::move(other.m_albedo)),
-    m_metallic(std::move(other.m_albedo)),
-    m_normal(std::move(other.m_albedo)),
-    m_roughness(std::move(other.m_albedo))
+    m_ao(std::move(other.m_ao)),
+    m_metallic(std::move(other.m_metallic)),
+    m_normal(std::move(other.m_normal)),
+    m_roughness(std::move(other.m_roughness))
 {
 }
 
