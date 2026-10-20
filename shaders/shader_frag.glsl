@@ -14,6 +14,7 @@ layout(std140) uniform Material // Must match the GPUMaterial defined in src/mes
 };
 
 uniform sampler2D colorMap;
+uniform samplerCube irradianceMap;
 uniform bool hasTexCoords;
 uniform bool useMaterial;
 uniform vec3 lightPosition;
@@ -71,6 +72,12 @@ vec3 fresnel(vec3 halfwayVector, vec3 fragToCamera, vec3 F0) {
     return F0 + (1 - F0) * pow(clamp(1 - max(dot(halfwayVector,fragToCamera), 0.0), 0.0, 1.0), 5);
 }
 
+// The lighting for the environment case takes into consideration light from several directions. Thus, there is not a specific
+// "halfway" vector. This formula takes into account the roughness of the fragment so that the lighting does not look weird.
+vec3 fresnelWithRoughness(vec3 fragNormal, vec3 fragToCamera, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1 - max(dot(fragNormal, fragToCamera), 0.0), 0.0, 1.0), 5);
+}
+
 
 
 void main()
@@ -116,7 +123,16 @@ void main()
         // LearnOpenGL advises to add a 0.0001 to the denominator to ensure no divisions by zero
         vec3 outgoingRadiance = (kD * (albedo / pi) + ((ndf * geometry * kS) / (4 * max(dot(normal, fragToCamera), 0.0) * cosTheta + 0.0001))) * lightRadiance * cosTheta;
 
-        vec3 ambient = vec3(0.03) * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
+        vec3 ambient;
+        if (useIBL == 0) {
+            ambient = vec3(0.03) * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
+        }
+        else { // If IBL is used, use the lighting reflected from the environment as the ambient term instead.
+            vec3 irradiance = texture(irradianceMap, normal).xyz;
+            vec3 IBLkS = fresnelWithRoughness(normal, fragToCamera, F0, roughness);
+            vec3 IBLkD = vec3(1.0) - IBLkS;
+            ambient = IBLkD * irradiance * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
+        }
         vec3 color = ambient + outgoingRadiance;
 
         // Finally, implement gamma correcting for more realistic colors to the eye:
