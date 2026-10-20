@@ -143,12 +143,15 @@ public:
             switch (m_cameraMode) {
                 case Aerial:
                     m_viewMatrix = glm::lookAt(glm::vec3(m_aerialX, m_aerialY, m_aerialZ), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+                    cameraPosition = glm::vec3(m_aerialX, m_aerialY, m_aerialZ);
                     break;
                 case Top:
                     m_viewMatrix = glm::lookAt(glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
+                    cameraPosition = glm::vec3(0, 10, 0);
                     break;
                 case Third:
                     m_viewMatrix = glm::lookAt(pos - 4.0f * dir + glm::vec3(0, 4, 0), pos, glm::vec3(0, 1, 0));
+                    cameraPosition = glm::vec3(pos - 4.0f * dir + glm::vec3(0, 4, 0));
                     break;
                 default:
                     break;
@@ -256,6 +259,7 @@ private:
     glm::mat4 m_projectionMatrix = glm::perspective(glm::radians(80.0f), 1.0f, 0.1f, 30.0f);
     glm::mat4 m_viewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0), glm::vec3(0, 1, 0));
     glm::mat4 m_modelMatrix { 1.0f };
+    glm::vec3 cameraPosition;
 
     // Meshes for building the boat
     GPUMesh m_hullMesh;
@@ -279,9 +283,9 @@ private:
         m_environment.bindIrradianceMap(GL_TEXTURE1);
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_defaultShader.getUniformLocation("useIBL"), 1);
-        glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(glm::vec3(3.0f, 5.0f, 3.0f)));
+        glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
-        glUniform3fv(m_defaultShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(glm::vec3(glm::inverse(m_viewMatrix)[3])));
+        glUniform3fv(m_defaultShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
         if (material != nullptr) {
             GLint textureSlots[] = {
                 GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6
