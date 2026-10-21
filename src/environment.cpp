@@ -189,6 +189,29 @@ void Environment::createIrradianceMap(GLuint frameBuffer, GLuint renderBuffer, g
 
 }
 
+// The prefilter map is used to pre-compute the first part of the split-sum of the specular part of the light equation.
+// This function is used to pre-compute this.
+void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer) {
+    glGenTextures(1, &m_prefilteredEnvMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilteredEnvMap);
+
+    // This part is the same as generating the cube map.
+    for (int i = 0; i < 6; i++) { // Generate a texture for each of the 6 faces of the cubemap, this time with a 128x128 resolution, as LearnOpenGL advises.
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, NULL);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // This time, different mipmaps will be generated depending on different roughness levels.
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP); // Recommended to determine the size of the mipmaps needed.
+
+
+}
+
 // The matrices here need to come from the MVP! There is no model matrix needed because the cube is all around the scene.
 void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix) {
     m_skyboxShader.bind();
@@ -233,6 +256,12 @@ void Environment::bindIrradianceMap(GLint irradianceMapSlot)
 {
     glActiveTexture(irradianceMapSlot);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradiencemap);
+}
+
+void Environment::bindPrefilteredMap(GLint prefilteredMapSlot)
+{
+    glActiveTexture(prefilteredMapSlot);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilteredEnvMap);
 }
 
 void Environment::renderCube() 
