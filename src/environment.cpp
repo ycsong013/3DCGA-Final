@@ -260,10 +260,13 @@ void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix) {
 }
 
 Environment::Environment(Environment&& other)
-    : m_environment(other.m_environment), m_cubemap(other.m_cubemap)
+    : m_environment(other.m_environment), m_cubemap(other.m_cubemap), 
+    m_irradiencemap(other.m_irradiencemap), m_prefilteredEnvMap(other.m_prefilteredEnvMap)
 {
     other.m_environment = INVALID;
     other.m_cubemap = INVALID;
+    other.m_irradiencemap = INVALID;
+    other.m_prefilteredEnvMap = INVALID;
 }
 
 Environment::~Environment()
@@ -274,6 +277,14 @@ Environment::~Environment()
     
     if (m_cubemap != INVALID) {
         glDeleteTextures(1, &m_cubemap);
+    }
+
+    if (m_prefilteredEnvMap != INVALID) {
+        glDeleteTextures(1, &m_prefilteredEnvMap);
+    }
+
+    if (m_irradiencemap != INVALID) {
+        glDeleteTextures(1, &m_irradiencemap);
     }
 }
 
