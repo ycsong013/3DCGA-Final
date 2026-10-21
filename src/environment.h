@@ -34,9 +34,10 @@ private:
     Shader m_hdrToCubeConverterShader; // Shader used to convert the HDR map into a cube.
     Shader m_skyboxShader; // Shader to render the environment map
     Shader m_convolutionShader;
+    Shader m_prefilterShader;
     void createCubeMap(GLuint frameBuffer, GLuint renderBuffer, glm::mat4 projectionMatrix, glm::mat4 viewMatrices[]);
     void createIrradianceMap(GLuint frameBuffer, GLuint renderBuffer, glm::mat4 projectionMatrix, glm::mat4 viewMatrices[]);
-    void createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer);
+    void createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer, glm::mat4 projectionMatrix, glm::mat4 viewMatrices[]);
     void renderCube();
     GLuint cubeVertexBuffer = 0;
     GLuint cubeVertexArray = 0;

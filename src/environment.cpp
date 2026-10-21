@@ -190,8 +190,13 @@ void Environment::createIrradianceMap(GLuint frameBuffer, GLuint renderBuffer, g
 }
 
 // The prefilter map is used to pre-compute the first part of the split-sum of the specular part of the light equation.
-// This function is used to pre-compute this.
-void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer) {
+// This function is used to pre-compute this. It's very similar to generating the irradiance map for diffusion.
+void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer, glm::mat4 projectionMatrix, glm::mat4 viewMatrices[]) {
+    ShaderBuilder prefilterBuilder;
+    prefilterBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/cube_vert.glsl");
+    prefilterBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/prefiltered_map_frag.glsl");
+    m_prefilterShader = prefilterBuilder.build();
+
     glGenTextures(1, &m_prefilteredEnvMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilteredEnvMap);
 
@@ -208,6 +213,38 @@ void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer) 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP); // Recommended to determine the size of the mipmaps needed.
+
+
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+
+    m_prefilterShader.bind();
+    glUniformMatrix4fv(m_prefilterShader.getUniformLocation("projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+    bindCubeMap(GL_TEXTURE0); // Bind the cube map to slot 0
+    glUniform1i(m_prefilterShader.getUniformLocation("skyboxMap"), 0);
+
+    unsigned int mipLevels = 5; // As defined in the LearnOpenGL example.
+    for (unsigned int mip = 0; mip < mipLevels; mip ++) {
+        unsigned int resolution = 128 * std::pow(0.5, mip); // Transform the resolution from 128 x 128 to the mipmap resolution level.
+
+        glBindRenderbuffer(GL_RENDERBUFFER, renderBuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, resolution, resolution);
+
+        glViewport(0, 0, resolution, resolution);
+        float roughness = float(mip/mipLevels);
+
+        glUniform1f(m_prefilterShader.getUniformLocation("roughness"), roughness);
+
+        for (int i = 0; i < 6; i++) {
+            glUniformMatrix4fv(m_prefilterShader.getUniformLocation("viewMatrix"), 1, GL_FALSE, glm::value_ptr(viewMatrices[i]));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_prefilteredEnvMap, mip); // Load the pre-filtered map texture to the frame buffer.
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the color buffer and the depth buffer, so empty the frame buffer's content.
+
+            renderCube();
+        }
+        
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
 }

@@ -9,7 +9,7 @@
 // had a value to learn for this specific course. This function is thus directly taken from the following tutorial
 // to create the Hammersley sequence, a low-discrepancy sequence commonly used in computer graphics: https://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
 
-uniform samplerCube environmentMap;
+uniform samplerCube skyboxMap;
 uniform float roughness; // The "roughness" would now be accessed according to the mipmap layer, as 
 // the pre-filtered map has different mip layers for different roughness values (increasing as we go on higher layers).
 
@@ -82,7 +82,7 @@ void main()
         float sampleWeight = max(dot(fragNormal, surfaceToLight), 0.0); // Treat the dot product between the light and the normal as how much weight that sample has. Light that arrives exactly parallel to the normal will contribute 100% to the specularity.
 
         if (sampleWeight > 0.0) {
-            color += texture(environmentMap, sampleWeight).xyz;
+            color += texture(skyboxMap, sampleWeight).xyz;
             totalSampleWeight += sampleWeight;
         }
 
