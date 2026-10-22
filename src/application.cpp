@@ -34,6 +34,7 @@ public:
         , m_hullMesh(makeHull())
         , m_boxMesh(makeUnitBox())
     {
+        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS); // To enable a seamless linear interpolation between the faces of the cube map.
         glDepthFunc(GL_LEQUAL); // Updated to ensure that the skybox is always outside.
         m_window.registerKeyCallback([this](int key, int scancode, int action, int mods) {
             if (action == GLFW_PRESS)
