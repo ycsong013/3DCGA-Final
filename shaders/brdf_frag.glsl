@@ -61,13 +61,8 @@ vec3 importanceSample(vec2 lowDiscrepancySample, float roughness, vec3 zDirectio
 // This function is copied and pasted from the main PBR shader.
 float geometryFunction(float roughness, vec3 normal, vec3 fragToCamera, vec3 fragToLight) {
     float k;
-    if (useIBL == 0) {
-        // No IBL is used
-        k = pow(roughness + 1, 2) / 8;
-    } else {
-        // IBL is used
-        k = pow(roughness, 2) / 2;
-    }
+    // IBL is used: Difference from the main PBR shader
+    k = pow(roughness, 2) / 2;
 
     float normalDotFragToCamera = max(dot(normal, fragToCamera), 0.0);
     float normalDotFragToLight = max(dot(normal, fragToLight), 0.0);
