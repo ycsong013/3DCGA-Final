@@ -31,7 +31,7 @@ vec3 importanceSample(vec2 lowDiscrepancySample, float roughness, vec3 zDirectio
     // In the normal formula, the roughness is squared, however, as per the explanation we gave in the default shader,
     // Epic Games and Disney's research led to the fact that roughness is more realistic when squared initially, so
     // it becomes a power of 4 (Source: LearnOpenGL)
-    float costheta = sqrt((1 - lowDiscrepancySample.y) / (1 + (pow(roughness, 4)) * lowDiscrepancySample.y));
+    float costheta = sqrt((1 - lowDiscrepancySample.y) / (1 + (pow(roughness, 4) - 1) * lowDiscrepancySample.y));
     float sintheta = sqrt((1 - pow(costheta, 2)));
 
     // Convert from the spherical coordinates to the cartesian coordinates:
@@ -45,7 +45,7 @@ vec3 importanceSample(vec2 lowDiscrepancySample, float roughness, vec3 zDirectio
 
     vec3 yDirection;
 
-    if (zDirection < 0.999) {
+    if (abs(zDirection.z) < 0.999) {
         yDirection = vec3(0.0f, 0.0f, 1.0f);
     } else {
         yDirection = vec3(1.0f, 0.0f, 0.0f);
@@ -80,7 +80,7 @@ void main()
     float scaleTerm = 0;
     float biasTerm = 0;
 
-    vec3 fragNormal = (0.0f, 0.0f, 1.0f);
+    vec3 fragNormal = vec3(0.0f, 0.0f, 1.0f);
 
     uint sampleCount = 1024u;
 
@@ -88,16 +88,17 @@ void main()
         vec2 lowDiscrepancySequence = hammersleyFunction(i, sampleCount);
         vec3 sampledVector = importanceSample(lowDiscrepancySequence, roughness, fragNormal); // sampled halfway vector.
 
-        vec3 fragToLight = reflect(-fragNormal, sampledVector);
+        vec3 fragToLight = reflect(-fragToCamera, sampledVector);
 
-        // Here, N: fragNormal, H: halfway vector, V: surfaceToLight
+        // Here, N: fragNormal, H: halfway vector, V: surfaceToCamera, L: fragToLight
         float NdotL = max(dot(fragNormal, fragToLight), 0.0);
         float NdotH = max(dot(fragNormal, sampledVector), 0.0);
-        float VdotH = max(dot(fragToLight, sampledVector), 0.0); // 
+        float VdotH = max(dot(fragToCamera, sampledVector), 0.0); 
+        float NdotV = max(dot(fragNormal, fragToCamera), 0.0);
 
         if (NdotL > 0.0) {
             float geometry = geometryFunction(roughness, fragNormal, fragToCamera, fragToLight);
-            float brdfTerm = (geometry * VdotH) / (NdotH * NdotV + 0.0001);
+            float brdfTerm = (geometry * VdotH) / (NdotH * NdotV + 0.0001f);
             float fresnelTerm = pow(1 - VdotH, 5);
             scaleTerm += (1 - fresnelTerm) * brdfTerm;
             biasTerm += fresnelTerm * brdfTerm;

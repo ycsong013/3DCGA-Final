@@ -21,7 +21,7 @@ void main()
     vec3 xDirection = normalize(cross(yDirection, zDirection)); // This way, x is certainly perpendicular to z.
     yDirection = normalize(cross(zDirection, xDirection));
 
-    float samplingStep = 0.025;
+    float samplingStep = 0.1;
 
     int numOfSamples = 0;
 

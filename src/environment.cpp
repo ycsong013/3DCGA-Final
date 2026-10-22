@@ -29,6 +29,7 @@ DISABLE_WARNINGS_POP()
 
 Environment::Environment(std::filesystem::path filePath) 
 {
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     // This "loading an HDR logic" was taken from the LearnOpenGL tutorial. 
     stbi_set_flip_vertically_on_load(true);
     int width, height, componentNumber;
@@ -67,6 +68,8 @@ Environment::Environment(std::filesystem::path filePath)
 
         createCubeMap(frameBuffer, renderBuffer, projectionMatrix, viewMatrices);
         createIrradianceMap(frameBuffer, renderBuffer, projectionMatrix, viewMatrices);
+        createPrefilteredMap(frameBuffer, renderBuffer, projectionMatrix, viewMatrices);
+        createBRDFMap(frameBuffer, renderBuffer);
         glViewport(0, 0, 1024, 1024); // Reset back to the previous size of the viewport, as the cubemap and irradiance map will change the viewport.
         glDeleteFramebuffers(1, &frameBuffer);
         glDeleteRenderbuffers(1, &renderBuffer);
@@ -134,6 +137,7 @@ void Environment::createCubeMap(GLuint frameBuffer, GLuint renderBuffer, glm::ma
     }
 
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP); // Allow for the cubemap to have mipmap levels (this part is used for creating a smooth prefiltered environment map)
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // From this point on (as we initialized the environment, the HDR turned into the cube map, and "m_cubemap" has this information.)
@@ -221,7 +225,6 @@ void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer, 
     m_prefilterShader.bind();
     glUniformMatrix4fv(m_prefilterShader.getUniformLocation("projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projectionMatrix));
     bindCubeMap(GL_TEXTURE0); // Bind the cube map to slot 0
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glUniform1i(m_prefilterShader.getUniformLocation("skyboxMap"), 0);
 
     unsigned int mipLevels = 5; // As defined in the LearnOpenGL example.
@@ -232,7 +235,7 @@ void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer, 
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, resolution, resolution);
 
         glViewport(0, 0, resolution, resolution);
-        float roughness = float(mip/mipLevels);
+        float roughness = float(mip)/float(mipLevels - 1);
 
         glUniform1f(m_prefilterShader.getUniformLocation("roughness"), roughness);
 
@@ -298,12 +301,14 @@ void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix) {
 
 Environment::Environment(Environment&& other)
     : m_environment(other.m_environment), m_cubemap(other.m_cubemap), 
-    m_irradiencemap(other.m_irradiencemap), m_prefilteredEnvMap(other.m_prefilteredEnvMap)
+    m_irradiencemap(other.m_irradiencemap), m_prefilteredEnvMap(other.m_prefilteredEnvMap), 
+    m_brdfmap(other.m_brdfmap)
 {
     other.m_environment = INVALID;
     other.m_cubemap = INVALID;
     other.m_irradiencemap = INVALID;
     other.m_prefilteredEnvMap = INVALID;
+    other.m_brdfmap = INVALID;
 }
 
 Environment::~Environment()
@@ -322,6 +327,10 @@ Environment::~Environment()
 
     if (m_irradiencemap != INVALID) {
         glDeleteTextures(1, &m_irradiencemap);
+    }
+
+    if (m_brdfmap != INVALID) {
+        glDeleteTextures(1, &m_brdfmap);
     }
 }
 
@@ -458,9 +467,9 @@ void Environment::renderQuad() {
         // Add in the information of each float per vertex -> There are 5 floats per vertex,
         // so do 3 + 2
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*) 0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*) 0);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*) (3* sizeof(float)));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*) (3* sizeof(float)));
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);

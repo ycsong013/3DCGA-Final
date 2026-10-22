@@ -135,6 +135,8 @@ void main()
             vec3 IBLkS = fresnelWithRoughness(normal, fragToCamera, F0, roughness);
             vec3 IBLkD = vec3(1.0) - IBLkS;
 
+            IBLkD *= (1.0 - metallic);
+
             vec3 reflectedLight = reflect(-fragToCamera, normal);
             vec3 prefilterColor = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz; // 4 is used here because the prefiltered map contains 4 mipmap levels, ensuring that it doesn't go above 4
             vec2 brdfResult = texture(brdfMap, vec2(max(dot(normal, fragToCamera), 0.0), roughness)).xy;

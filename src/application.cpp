@@ -34,7 +34,6 @@ public:
         , m_hullMesh(makeHull())
         , m_boxMesh(makeUnitBox())
     {
-        glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS); // To enable a seamless linear interpolation between the faces of the cube map.
         glDepthFunc(GL_LEQUAL); // Updated to ensure that the skybox is always outside.
         m_window.registerKeyCallback([this](int key, int scancode, int action, int mods) {
             if (action == GLFW_PRESS)
@@ -267,7 +266,7 @@ private:
     GPUMesh m_boxMesh;
     Node m_boatRoot;
 
-    PBRMaterial m_goldMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/bamboo-wood-semigloss-bl/bamboo-wood-semigloss-");
+    PBRMaterial m_goldMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/white-gold-bl/white-gold_");
 
     void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
 
@@ -282,7 +281,11 @@ private:
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
         m_environment.bindIrradianceMap(GL_TEXTURE1);
+        m_environment.bindPrefilteredMap(GL_TEXTURE7);
+        m_environment.bindBRDFMap(GL_TEXTURE8);
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
+        glUniform1i(m_defaultShader.getUniformLocation("prefilteredMap"), 7);
+        glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
         glUniform1i(m_defaultShader.getUniformLocation("useIBL"), 1);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));

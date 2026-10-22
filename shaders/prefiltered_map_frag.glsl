@@ -39,7 +39,7 @@ vec3 importanceSample(vec2 lowDiscrepancySample, float roughness, vec3 zDirectio
     // In the normal formula, the roughness is squared, however, as per the explanation we gave in the default shader,
     // Epic Games and Disney's research led to the fact that roughness is more realistic when squared initially, so
     // it becomes a power of 4 (Source: LearnOpenGL)
-    float costheta = sqrt((1 - lowDiscrepancySample.y) / (1 + (pow(roughness, 4)) * lowDiscrepancySample.y));
+    float costheta = sqrt((1 - lowDiscrepancySample.y) / (1 + (pow(roughness, 4) - 1) * lowDiscrepancySample.y));
     float sintheta = sqrt((1 - pow(costheta, 2)));
 
     // Convert from the spherical coordinates to the cartesian coordinates:
@@ -53,7 +53,7 @@ vec3 importanceSample(vec2 lowDiscrepancySample, float roughness, vec3 zDirectio
 
     vec3 yDirection;
 
-    if (zDirection < 0.999) {
+    if (abs(zDirection.z) < 0.999) {
         yDirection = vec3(0.0f, 0.0f, 1.0f);
     } else {
         yDirection = vec3(1.0f, 0.0f, 0.0f);
@@ -81,6 +81,11 @@ void main()
     uint sampleCount = 1024u;
     vec3 fragNormal = normalize(fragPosition);
 
+    if (roughness == 0.0) {
+        fragColor = vec4(textureLod(skyboxMap, fragNormal, 0.0).xyz, 1.0);
+        return;
+    }
+
     vec3 color = vec3(0.0f);
     float totalSampleWeight = 0.0f;
 
@@ -96,12 +101,12 @@ void main()
         // Again, this part was written from understanding the tutorial, then writing the code without looking at the tutorial.
         if (sampleWeight > 0.0) {
             float ndf = NDF(radians(180), roughness, fragNormal, sampledVector);
-            float pdf = (ndf * max(sampleWeight, fragNormal, 0.0) / ( 4 * max(dot(sampleWeight, surfaceToLight), 0.0))) + 0.0001;
+            float pdf = (ndf * max(dot(sampledVector, fragNormal), 0.0) / ( 4 * max(dot(sampledVector, surfaceToLight), 0.0))) + 0.0001;
             float solidAngleArea = 4 * radians(180) / (6 * pow(512, 2)); // 512 due to the resolution of the original cube map. This is to find the area of one solid angle.
             float monteCarloArea = 1 / (float(sampleCount) * pdf + 0.0001);
-            float mipMapLevel = (roughness == 0.0f ? 0.0f : 0.5f * log2(solidAngleArea / monteCarloArea));
+            float mipMapLevel = (roughness == 0.0f ? 0.0f : 0.5f * log2(monteCarloArea / solidAngleArea));
 
-            color += texture(skyboxMap, surfaceToLight, mipMapLevel).xyz * sampleWeight;
+            color += textureLod(skyboxMap, surfaceToLight, mipMapLevel).xyz * sampleWeight;
             totalSampleWeight += sampleWeight;
         }
 
