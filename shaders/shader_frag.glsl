@@ -30,6 +30,9 @@ uniform sampler2D textureMetallic;
 uniform sampler2D textureRoughness;
 uniform sampler2D textureAO;
 
+uniform samplerCube prefilteredMap;
+uniform sampler2D brdfMap;
+
 in vec3 fragPosition;
 in vec3 fragNormal;
 in vec2 fragTexCoord;
@@ -131,7 +134,16 @@ void main()
             vec3 irradiance = texture(irradianceMap, normal).xyz;
             vec3 IBLkS = fresnelWithRoughness(normal, fragToCamera, F0, roughness);
             vec3 IBLkD = vec3(1.0) - IBLkS;
-            ambient = IBLkD * irradiance * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
+
+            vec3 reflectedLight = reflect(-fragToCamera, normal);
+            vec3 prefilterColor = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz; // 4 is used here because the prefiltered map contains 4 mipmap levels, ensuring that it doesn't go above 4
+            vec2 brdfResult = texture(brdfMap, vec2(max(dot(normal, fragToCamera), 0.0), roughness)).xy;
+
+            vec3 specularLight = prefilterColor * (IBLkS * brdfResult.x + brdfResult.y);
+
+            ambient = (IBLkD * irradiance * albedo + specularLight) * ambientOcclusion; // LearnOpenGL advises to add an ambient term
+
+
         }
         vec3 color = ambient + outgoingRadiance;
 
