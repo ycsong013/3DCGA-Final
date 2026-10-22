@@ -133,6 +133,7 @@ void Environment::createCubeMap(GLuint frameBuffer, GLuint renderBuffer, glm::ma
         renderCube();
     }
 
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP); // Allow for the cubemap to have mipmap levels (this part is used for creating a smooth prefiltered environment map)
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // From this point on (as we initialized the environment, the HDR turned into the cube map, and "m_cubemap" has this information.)
@@ -220,6 +221,7 @@ void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer, 
     m_prefilterShader.bind();
     glUniformMatrix4fv(m_prefilterShader.getUniformLocation("projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projectionMatrix));
     bindCubeMap(GL_TEXTURE0); // Bind the cube map to slot 0
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glUniform1i(m_prefilterShader.getUniformLocation("skyboxMap"), 0);
 
     unsigned int mipLevels = 5; // As defined in the LearnOpenGL example.

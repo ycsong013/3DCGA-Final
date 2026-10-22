@@ -66,6 +66,16 @@ vec3 importanceSample(vec2 lowDiscrepancySample, float roughness, vec3 zDirectio
     return normalize(sampleVector);
 }
 
+float NDF(float pi, float roughness, vec3 normal, vec3 halfwayVector) {
+    float ndfResult = pow(roughness, 4); // Mentioned on the tutorial (https://learnopengl.com/PBR/Lighting) 
+    // that big animation companies like Disney and Epic Games prefer using the SQUARE of the roughness as the normal roughness. So I took the 4th power.
+    // This is the case for the normal distribution function and the geometry function.
+
+    ndfResult /= pi;
+    ndfResult /= pow(pow( max(dot(normal, halfwayVector), 0.0), 2) * (pow(roughness, 4) - 1) + 1, 2);
+    return ndfResult;
+}
+
 void main()
 {
     uint sampleCount = 1024u;
@@ -76,13 +86,22 @@ void main()
 
     for (uint i = 0u; i < sampleCount; i = i + 1u) {
         vec2 lowDiscrepancySequence = hammersleyFunction(i, sampleCount);
-        vec3 sampledVector = importanceSample(lowDiscrepancySequence, roughness, fragNormal);
+        vec3 sampledVector = importanceSample(lowDiscrepancySequence, roughness, fragNormal); // Halfway vector
         vec3 surfaceToLight = reflect(-fragNormal, sampledVector); // We have the normal and the reflected light, so do the reverse to find the light.
 
         float sampleWeight = max(dot(fragNormal, surfaceToLight), 0.0); // Treat the dot product between the light and the normal as how much weight that sample has. Light that arrives exactly parallel to the normal will contribute 100% to the specularity.
 
+        // The following part is used to find the mip location within the skybox that we will use to access the texture. The function formulas were
+        // taken from LearnOpenGL's tutorial above. The LearnOpenGL tutorial itself uses this tutorial to find the mip level: https://chetanjags.wordpress.com/2015/08/26/image-based-lighting/.
+        // Again, this part was written from understanding the tutorial, then writing the code without looking at the tutorial.
         if (sampleWeight > 0.0) {
-            color += texture(skyboxMap, sampleWeight).xyz;
+            float ndf = NDF(radians(180), roughness, fragNormal, sampledVector);
+            float pdf = (ndf * max(sampleWeight, fragNormal, 0.0) / ( 4 * max(dot(sampleWeight, surfaceToLight), 0.0))) + 0.0001;
+            float solidAngleArea = 4 * radians(180) / (6 * pow(512, 2)); // 512 due to the resolution of the original cube map. This is to find the area of one solid angle.
+            float monteCarloArea = 1 / (float(sampleCount) * pdf + 0.0001);
+            float mipMapLevel = (roughness == 0.0f ? 0.0f : 0.5f * log2(solidAngleArea / monteCarloArea));
+
+            color += texture(skyboxMap, surfaceToLight, mipMapLevel).xyz * sampleWeight;
             totalSampleWeight += sampleWeight;
         }
 
