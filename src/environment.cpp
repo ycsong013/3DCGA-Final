@@ -251,6 +251,41 @@ void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer, 
 
 }
 
+void Environment::createBRDFMap(GLuint frameBuffer, GLuint renderBuffer) {
+    ShaderBuilder brdfBuilder;
+    brdfBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/brdf_vert.glsl");
+    brdfBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/brdf_frag.glsl");
+    m_brdfShader = brdfBuilder.build();
+
+    glGenTextures(1, &m_brdfmap);
+    glBindTexture(GL_TEXTURE_2D, m_brdfmap);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0); // Set the BRDF map resolution to 512 x 512
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glViewport(0, 0, 512, 512);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, renderBuffer);
+
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_brdfmap, 0);
+
+    m_brdfShader.bind(); // There's no uniforms, so no passing anything. 
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    renderQuad();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+}
+
 // The matrices here need to come from the MVP! There is no model matrix needed because the cube is all around the scene.
 void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix) {
     m_skyboxShader.bind();
@@ -312,6 +347,11 @@ void Environment::bindPrefilteredMap(GLint prefilteredMapSlot)
 {
     glActiveTexture(prefilteredMapSlot);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilteredEnvMap);
+}
+
+void Environment::bindBRDFMap(GLint brdfMapSlot) {
+    glActiveTexture(brdfMapSlot);
+    glBindTexture(GL_TEXTURE_2D, m_brdfmap);
 }
 
 void Environment::renderCube() 
@@ -389,5 +429,45 @@ void Environment::renderCube()
 
     glBindVertexArray(cubeVertexArray);
     glDrawArrays(GL_TRIANGLES, 0, 36); 
+    glBindVertexArray(0);
+}
+
+// This code is very similar to the renderCube function, again it was needed to create the BRDF map, as 
+// the BRDF map is in a 2D quad.
+
+void Environment::renderQuad() {
+    if (quadVertexArray == 0) {
+        // These vertices are taken from the LearnOpenGL tutorial (https://learnopengl.com/PBR/IBL/Specular-IBL) directly. As 
+        // mentioned, same as the cube, we did not think it was useful to write these down from scratch.
+        float quadVertices[] = {
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+
+        glGenVertexArrays(1, &quadVertexArray);
+        glGenBuffers(1, &quadVertexBuffer);
+
+        glBindBuffer(GL_ARRAY_BUFFER, quadVertexBuffer);
+
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW); // Static draw means: We load these quad vertices once and they will never change.
+
+        glBindVertexArray(quadVertexArray);
+
+        // Add in the information of each float per vertex -> There are 5 floats per vertex,
+        // so do 3 + 2
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*) 0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*) (3* sizeof(float)));
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+
+    }
+
+    glBindVertexArray(quadVertexArray);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); // The number of vertices is 4, GL_TRIANGLE can only be called with 6 vertices.
     glBindVertexArray(0);
 }
