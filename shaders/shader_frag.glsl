@@ -14,6 +14,7 @@ layout(std140) uniform Material // Must match the GPUMaterial defined in src/mes
 };
 
 uniform sampler2D colorMap;
+uniform samplerCube irradianceMap;
 uniform bool hasTexCoords;
 uniform bool useMaterial;
 uniform vec3 lightPosition;
@@ -28,6 +29,9 @@ uniform sampler2D textureNormal;
 uniform sampler2D textureMetallic;
 uniform sampler2D textureRoughness;
 uniform sampler2D textureAO;
+
+uniform samplerCube prefilteredMap;
+uniform sampler2D brdfMap;
 
 in vec3 fragPosition;
 in vec3 fragNormal;
@@ -69,6 +73,12 @@ float geometryFunction(float roughness, vec3 normal, vec3 fragToCamera, vec3 fra
 // Note that this also represents the ks (the fraction of light that is reflected), as LearnOpenGL mentions.
 vec3 fresnel(vec3 halfwayVector, vec3 fragToCamera, vec3 F0) {
     return F0 + (1 - F0) * pow(clamp(1 - max(dot(halfwayVector,fragToCamera), 0.0), 0.0, 1.0), 5);
+}
+
+// The lighting for the environment case takes into consideration light from several directions. Thus, there is not a specific
+// "halfway" vector. This formula takes into account the roughness of the fragment so that the lighting does not look weird.
+vec3 fresnelWithRoughness(vec3 fragNormal, vec3 fragToCamera, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1 - max(dot(fragNormal, fragToCamera), 0.0), 0.0, 1.0), 5);
 }
 
 
@@ -116,7 +126,27 @@ void main()
         // LearnOpenGL advises to add a 0.0001 to the denominator to ensure no divisions by zero
         vec3 outgoingRadiance = (kD * (albedo / pi) + ((ndf * geometry * kS) / (4 * max(dot(normal, fragToCamera), 0.0) * cosTheta + 0.0001))) * lightRadiance * cosTheta;
 
-        vec3 ambient = vec3(0.03) * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
+        vec3 ambient;
+        if (useIBL == 0) {
+            ambient = vec3(0.03) * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
+        }
+        else { // If IBL is used, use the lighting reflected from the environment as the ambient term instead.
+            vec3 irradiance = texture(irradianceMap, normal).xyz;
+            vec3 IBLkS = fresnelWithRoughness(normal, fragToCamera, F0, roughness);
+            vec3 IBLkD = vec3(1.0) - IBLkS;
+
+            IBLkD *= (1.0 - metallic);
+
+            vec3 reflectedLight = reflect(-fragToCamera, normal);
+            vec3 prefilterColor = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz; // 4 is used here because the prefiltered map contains 4 mipmap levels, ensuring that it doesn't go above 4
+            vec2 brdfResult = texture(brdfMap, vec2(max(dot(normal, fragToCamera), 0.0), roughness)).xy;
+
+            vec3 specularLight = prefilterColor * (IBLkS * brdfResult.x + brdfResult.y);
+
+            ambient = (IBLkD * irradiance * albedo + specularLight) * ambientOcclusion; // LearnOpenGL advises to add an ambient term
+
+
+        }
         vec3 color = ambient + outgoingRadiance;
 
         // Finally, implement gamma correcting for more realistic colors to the eye:

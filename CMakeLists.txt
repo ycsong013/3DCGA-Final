@@ -17,6 +17,7 @@ add_executable(Master_TechDemo
 	"src/sea.cpp"
 	"src/environment.cpp"
 	"src/bezier.cpp"
+	"src/pbrmaterial.cpp"
 )
 
 target_compile_definitions(Master_TechDemo PRIVATE RESOURCE_ROOT="${CMAKE_CURRENT_LIST_DIR}/")

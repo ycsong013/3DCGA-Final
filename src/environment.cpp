@@ -29,6 +29,7 @@ DISABLE_WARNINGS_POP()
 
 Environment::Environment(std::filesystem::path filePath) 
 {
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     // This "loading an HDR logic" was taken from the LearnOpenGL tutorial. 
     stbi_set_flip_vertically_on_load(true);
     int width, height, componentNumber;
@@ -67,6 +68,8 @@ Environment::Environment(std::filesystem::path filePath)
 
         createCubeMap(frameBuffer, renderBuffer, projectionMatrix, viewMatrices);
         createIrradianceMap(frameBuffer, renderBuffer, projectionMatrix, viewMatrices);
+        createPrefilteredMap(frameBuffer, renderBuffer, projectionMatrix, viewMatrices);
+        createBRDFMap(frameBuffer, renderBuffer);
         glViewport(0, 0, 1024, 1024); // Reset back to the previous size of the viewport, as the cubemap and irradiance map will change the viewport.
         glDeleteFramebuffers(1, &frameBuffer);
         glDeleteRenderbuffers(1, &renderBuffer);
@@ -133,6 +136,8 @@ void Environment::createCubeMap(GLuint frameBuffer, GLuint renderBuffer, glm::ma
         renderCube();
     }
 
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP); // Allow for the cubemap to have mipmap levels (this part is used for creating a smooth prefiltered environment map)
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // From this point on (as we initialized the environment, the HDR turned into the cube map, and "m_cubemap" has this information.)
@@ -189,6 +194,101 @@ void Environment::createIrradianceMap(GLuint frameBuffer, GLuint renderBuffer, g
 
 }
 
+// The prefilter map is used to pre-compute the first part of the split-sum of the specular part of the light equation.
+// This function is used to pre-compute this. It's very similar to generating the irradiance map for diffusion.
+void Environment::createPrefilteredMap(GLuint frameBuffer, GLuint renderBuffer, glm::mat4 projectionMatrix, glm::mat4 viewMatrices[]) {
+    ShaderBuilder prefilterBuilder;
+    prefilterBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/cube_vert.glsl");
+    prefilterBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/prefiltered_map_frag.glsl");
+    m_prefilterShader = prefilterBuilder.build();
+
+    glGenTextures(1, &m_prefilteredEnvMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilteredEnvMap);
+
+    // This part is the same as generating the cube map.
+    for (int i = 0; i < 6; i++) { // Generate a texture for each of the 6 faces of the cubemap, this time with a 128x128 resolution, as LearnOpenGL advises.
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 128, 128, 0, GL_RGB, GL_FLOAT, NULL);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // This time, different mipmaps will be generated depending on different roughness levels.
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP); // Recommended to determine the size of the mipmaps needed.
+
+
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+
+    m_prefilterShader.bind();
+    glUniformMatrix4fv(m_prefilterShader.getUniformLocation("projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projectionMatrix));
+    bindCubeMap(GL_TEXTURE0); // Bind the cube map to slot 0
+    glUniform1i(m_prefilterShader.getUniformLocation("skyboxMap"), 0);
+
+    unsigned int mipLevels = 5; // As defined in the LearnOpenGL example.
+    for (unsigned int mip = 0; mip < mipLevels; mip ++) {
+        unsigned int resolution = 128 * std::pow(0.5, mip); // Transform the resolution from 128 x 128 to the mipmap resolution level.
+
+        glBindRenderbuffer(GL_RENDERBUFFER, renderBuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, resolution, resolution);
+
+        glViewport(0, 0, resolution, resolution);
+        float roughness = float(mip)/float(mipLevels - 1);
+
+        glUniform1f(m_prefilterShader.getUniformLocation("roughness"), roughness);
+
+        for (int i = 0; i < 6; i++) {
+            glUniformMatrix4fv(m_prefilterShader.getUniformLocation("viewMatrix"), 1, GL_FALSE, glm::value_ptr(viewMatrices[i]));
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_prefilteredEnvMap, mip); // Load the pre-filtered map texture to the frame buffer.
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the color buffer and the depth buffer, so empty the frame buffer's content.
+
+            renderCube();
+        }
+        
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+}
+
+void Environment::createBRDFMap(GLuint frameBuffer, GLuint renderBuffer) {
+    ShaderBuilder brdfBuilder;
+    brdfBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/brdf_vert.glsl");
+    brdfBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/brdf_frag.glsl");
+    m_brdfShader = brdfBuilder.build();
+
+    glGenTextures(1, &m_brdfmap);
+    glBindTexture(GL_TEXTURE_2D, m_brdfmap);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0); // Set the BRDF map resolution to 512 x 512
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glViewport(0, 0, 512, 512);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, frameBuffer);
+    glBindRenderbuffer(GL_RENDERBUFFER, renderBuffer);
+
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_brdfmap, 0);
+
+    m_brdfShader.bind(); // There's no uniforms, so no passing anything. 
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    renderQuad();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+}
+
 // The matrices here need to come from the MVP! There is no model matrix needed because the cube is all around the scene.
 void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix) {
     m_skyboxShader.bind();
@@ -200,10 +300,15 @@ void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix) {
 }
 
 Environment::Environment(Environment&& other)
-    : m_environment(other.m_environment), m_cubemap(other.m_cubemap)
+    : m_environment(other.m_environment), m_cubemap(other.m_cubemap), 
+    m_irradiencemap(other.m_irradiencemap), m_prefilteredEnvMap(other.m_prefilteredEnvMap), 
+    m_brdfmap(other.m_brdfmap)
 {
     other.m_environment = INVALID;
     other.m_cubemap = INVALID;
+    other.m_irradiencemap = INVALID;
+    other.m_prefilteredEnvMap = INVALID;
+    other.m_brdfmap = INVALID;
 }
 
 Environment::~Environment()
@@ -214,6 +319,18 @@ Environment::~Environment()
     
     if (m_cubemap != INVALID) {
         glDeleteTextures(1, &m_cubemap);
+    }
+
+    if (m_prefilteredEnvMap != INVALID) {
+        glDeleteTextures(1, &m_prefilteredEnvMap);
+    }
+
+    if (m_irradiencemap != INVALID) {
+        glDeleteTextures(1, &m_irradiencemap);
+    }
+
+    if (m_brdfmap != INVALID) {
+        glDeleteTextures(1, &m_brdfmap);
     }
 }
 
@@ -233,6 +350,17 @@ void Environment::bindIrradianceMap(GLint irradianceMapSlot)
 {
     glActiveTexture(irradianceMapSlot);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradiencemap);
+}
+
+void Environment::bindPrefilteredMap(GLint prefilteredMapSlot)
+{
+    glActiveTexture(prefilteredMapSlot);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilteredEnvMap);
+}
+
+void Environment::bindBRDFMap(GLint brdfMapSlot) {
+    glActiveTexture(brdfMapSlot);
+    glBindTexture(GL_TEXTURE_2D, m_brdfmap);
 }
 
 void Environment::renderCube() 
@@ -310,5 +438,45 @@ void Environment::renderCube()
 
     glBindVertexArray(cubeVertexArray);
     glDrawArrays(GL_TRIANGLES, 0, 36); 
+    glBindVertexArray(0);
+}
+
+// This code is very similar to the renderCube function, again it was needed to create the BRDF map, as 
+// the BRDF map is in a 2D quad.
+
+void Environment::renderQuad() {
+    if (quadVertexArray == 0) {
+        // These vertices are taken from the LearnOpenGL tutorial (https://learnopengl.com/PBR/IBL/Specular-IBL) directly. As 
+        // mentioned, same as the cube, we did not think it was useful to write these down from scratch.
+        float quadVertices[] = {
+            -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+            -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+             1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+
+        glGenVertexArrays(1, &quadVertexArray);
+        glGenBuffers(1, &quadVertexBuffer);
+
+        glBindBuffer(GL_ARRAY_BUFFER, quadVertexBuffer);
+
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW); // Static draw means: We load these quad vertices once and they will never change.
+
+        glBindVertexArray(quadVertexArray);
+
+        // Add in the information of each float per vertex -> There are 5 floats per vertex,
+        // so do 3 + 2
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*) 0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*) (3* sizeof(float)));
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+
+    }
+
+    glBindVertexArray(quadVertexArray);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4); // The number of vertices is 4, GL_TRIANGLE can only be called with 6 vertices.
     glBindVertexArray(0);
 }

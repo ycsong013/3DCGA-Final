@@ -51,7 +51,7 @@ public:
 
         //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
         m_meshes.push_back(makeGrid(100, 200));
-        buildBoat(m_boatRoot, m_hullMesh, m_boxMesh);
+        buildBoat(m_boatRoot, m_hullMesh, m_boxMesh, m_goldMaterial);
 
         m_path.build(glm::vec3(-5.0f, 0.0f, -5.0f),   // start of the linear bezier
                      glm::vec3(5.0f, 0.0f, -5.0f),    // end of the linear bezier / start of the quadratic bezier
@@ -143,12 +143,15 @@ public:
             switch (m_cameraMode) {
                 case Aerial:
                     m_viewMatrix = glm::lookAt(glm::vec3(m_aerialX, m_aerialY, m_aerialZ), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+                    cameraPosition = glm::vec3(m_aerialX, m_aerialY, m_aerialZ);
                     break;
                 case Top:
                     m_viewMatrix = glm::lookAt(glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
+                    cameraPosition = glm::vec3(0, 10, 0);
                     break;
                 case Third:
                     m_viewMatrix = glm::lookAt(pos - 4.0f * dir + glm::vec3(0, 4, 0), pos, glm::vec3(0, 1, 0));
+                    cameraPosition = glm::vec3(pos - 4.0f * dir + glm::vec3(0, 4, 0));
                     break;
                 default:
                     break;
@@ -256,13 +259,16 @@ private:
     glm::mat4 m_projectionMatrix = glm::perspective(glm::radians(80.0f), 1.0f, 0.1f, 30.0f);
     glm::mat4 m_viewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0), glm::vec3(0, 1, 0));
     glm::mat4 m_modelMatrix { 1.0f };
+    glm::vec3 cameraPosition;
 
     // Meshes for building the boat
     GPUMesh m_hullMesh;
     GPUMesh m_boxMesh;
     Node m_boatRoot;
 
-    void drawMesh(GPUMesh& mesh, const glm::mat4& model) {
+    PBRMaterial m_goldMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/white-gold-bl/white-gold_");
+
+    void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
         // Normals should be transformed differently than positions (ignoring translations + dealing with scaling):
@@ -274,7 +280,33 @@ private:
         //Uncomment this line when you use the modelMatrix (or fragmentPosition)
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-        if (mesh.hasTextureCoords()) {
+        m_environment.bindIrradianceMap(GL_TEXTURE1);
+        m_environment.bindPrefilteredMap(GL_TEXTURE7);
+        m_environment.bindBRDFMap(GL_TEXTURE8);
+        glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
+        glUniform1i(m_defaultShader.getUniformLocation("prefilteredMap"), 7);
+        glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
+        glUniform1i(m_defaultShader.getUniformLocation("useIBL"), 1);
+        glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
+        glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
+        glUniform3fv(m_defaultShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
+        if (material != nullptr) {
+            GLint textureSlots[] = {
+                GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6
+            };
+            material->bind(textureSlots);
+            glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_TRUE);
+            // Is there an easier way of doing this??? Check.
+            glUniform1i(m_defaultShader.getUniformLocation("usePBR"), 1);
+            glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), GL_FALSE);
+            glUniform1i(m_defaultShader.getUniformLocation("textureAlbedo"), 2);
+            glUniform1i(m_defaultShader.getUniformLocation("textureAO"), 3);
+            glUniform1i(m_defaultShader.getUniformLocation("textureMetallic"), 4);
+            glUniform1i(m_defaultShader.getUniformLocation("textureNormal"), 5);
+            glUniform1i(m_defaultShader.getUniformLocation("textureRoughness"), 6);
+
+        }
+        else if (mesh.hasTextureCoords()) {
             m_texture.bind(GL_TEXTURE0);
             glUniform1i(m_defaultShader.getUniformLocation("colorMap"), 0);
             glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_TRUE);
@@ -291,7 +323,7 @@ private:
         glm::mat4 world = parentWorld * node.transform;
 
         if (node.mesh) {
-            drawMesh(*node.mesh, world * node.meshTransform);
+            drawMesh(*node.mesh, world * node.meshTransform, node.m_material);
         }
 
         for (const auto& child : node.children) {

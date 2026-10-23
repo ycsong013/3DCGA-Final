@@ -7,6 +7,7 @@
 DISABLE_WARNINGS_PUSH()
 #include <glm/vec3.hpp>
 DISABLE_WARNINGS_POP()
+#include "pbrmaterial.h"
 
 #include <exception>
 #include <filesystem>
@@ -23,13 +24,15 @@ struct Node {
 
     std::vector<std::unique_ptr<Node>> children;
 
+    PBRMaterial* m_material = nullptr;
+
     Node* addChild() {
         children.push_back(std::make_unique<Node>());
         return children.back().get();
     }
 };
 
-void buildBoat(Node& root, GPUMesh& hullMesh, GPUMesh& boxMesh);
+void buildBoat(Node& root, GPUMesh& hullMesh, GPUMesh& boxMesh, PBRMaterial& boatMaterial);
 
 Mesh makeHull();
 
