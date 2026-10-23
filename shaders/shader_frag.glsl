@@ -36,6 +36,7 @@ uniform sampler2D brdfMap;
 in vec3 fragPosition;
 in vec3 fragNormal;
 in vec2 fragTexCoord;
+in mat3 fragTBN;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -99,7 +100,8 @@ void main()
         // them to the linear space, LearnOpenGL mentioned that we need to take its power to 2.2.
         vec3 albedo = pow(texture(textureAlbedo, fragTexCoord).rgb, vec3(2.2));
         normal = texture(textureNormal, fragTexCoord).xyz;
-        normal = normalize(normal * 2.0 - 1.0);        
+        normal = normal * 2.0 - 1.0;
+        normal = normalize(fragTBN * normal);   
         float metallic = texture(textureMetallic, fragTexCoord).x;
         float roughness = texture(textureRoughness, fragTexCoord).x; 
         float ambientOcclusion = texture(textureAO, fragTexCoord).x;
