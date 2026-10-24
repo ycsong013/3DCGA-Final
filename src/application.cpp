@@ -23,6 +23,7 @@ DISABLE_WARNINGS_POP()
 #include <functional>
 #include <iostream>
 #include <vector>
+#include <numbers>
 #include "environment.h"
 
 class Application {
@@ -32,6 +33,8 @@ public:
         , m_environment(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
         , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
         , m_hullMesh(makeHull())
+        , m_deckMesh(makeDeck())
+        , m_sailMesh(makeSail())
         , m_boxMesh(makeUnitBox())
     {
         glDepthFunc(GL_LEQUAL); // Updated to ensure that the skybox is always outside.
@@ -51,7 +54,8 @@ public:
 
         //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
         m_meshes.push_back(makeGrid(100, 200));
-        buildBoat(m_boatRoot, m_hullMesh, m_boxMesh, m_goldMaterial);
+        m_boat = buildBoat(m_boatRoot, m_hullMesh, m_deckMesh, m_boxMesh, m_sailMesh,
+            m_hullMaterial, m_deckMaterial, m_mastMaterial, m_sailMaterial);
 
         m_path.build(glm::vec3(-5.0f, 0.0f, -5.0f),   // start of the linear bezier
                      glm::vec3(5.0f, 0.0f, -5.0f),    // end of the linear bezier / start of the quadratic bezier
@@ -94,11 +98,21 @@ public:
             ImGui::Checkbox("Use material if no texture", &m_useMaterial);
             ImGui::Checkbox("Wireframe", &m_wireframe);
 
+            ImGui::Checkbox("Animate Boom", &m_animateBoom);
+            if (m_animateBoom) {
+                ImGui::SliderFloat("Boom speed (degrees / sec)", &m_boomSpeed, 0.0f, 60.0f);
+            }
+
+            ImGui::Checkbox("Pitch", &m_animatePitch);
+            if (m_animatePitch) {
+                ImGui::SliderFloat("Pitch speed (degrees / sec)", &m_pitchSpeed, 0.0f, 30.0f);
+            }
+
             ImGui::Checkbox("Show Bezier Path", &m_showPath);
 
             ImGui::Checkbox("Animate Boat", &m_animateBoat);
             if (m_animateBoat) {
-                ImGui::SliderFloat("Speed", &m_speed, 0.0f, 3.0f);
+                ImGui::SliderFloat("Speed", &m_speed, 0.0f, 30.0f);
             }
 
             const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
@@ -139,6 +153,19 @@ public:
             // Place the boat on the path, and make its bow point to the path.
             m_boatRoot.transform = glm::translate(glm::mat4(1.0f), pos)
                 * glm::rotate(glm::mat4(1.0f), std::atan2(dir.x, dir.z) - glm::radians(180.0f), glm::vec3(0, 1, 0));
+
+            // Make the boom sway
+            if (m_animateBoom) {
+                m_boomTime += interval;
+            }
+            setBoomAngle(*m_boat.boom, 30.0f * std::sin(m_boomSpeed / 30.0f * m_boomTime * static_cast<float>(std::numbers::pi) / 2.0f));
+
+            // Make the boat pitch
+            if (m_animatePitch) {
+                m_pitchTime += interval;
+            }
+            setPitchAngle(*m_boat.hull, 15.0f * std::sin(m_pitchSpeed / 15.0f * m_pitchTime * static_cast<float>(std::numbers::pi) / 2.0f));
+
 
             switch (m_cameraMode) {
                 case Aerial:
@@ -263,10 +290,24 @@ private:
 
     // Meshes for building the boat
     GPUMesh m_hullMesh;
+    GPUMesh m_deckMesh;
+    GPUMesh m_sailMesh;
     GPUMesh m_boxMesh;
     Node m_boatRoot;
 
-    PBRMaterial m_goldMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/white-gold-bl/white-gold_");
+    // User for setting the angle of the boom and the pitch
+    BoatParts m_boat;
+    bool m_animateBoom = false;
+    bool m_animatePitch = false;
+    float m_boomSpeed = 30.0f;
+    float m_boomTime = 0.0f;
+    float m_pitchSpeed = 30.0f;
+    float m_pitchTime = 0.0f;
+
+    PBRMaterial m_hullMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/white-gold-bl/white-gold_");
+    PBRMaterial m_deckMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/hungarian-point-flooring-bl/hungarian-point-flooring_");
+    PBRMaterial m_sailMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/coarse-loose-fabric-bl/coarse-loose-fabric_");
+    PBRMaterial m_mastMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/bamboo-wood-semigloss-bl/bamboo-wood-semigloss-");
 
     void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
 

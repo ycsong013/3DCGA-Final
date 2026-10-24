@@ -32,8 +32,18 @@ struct Node {
     }
 };
 
-void buildBoat(Node& root, GPUMesh& hullMesh, GPUMesh& boxMesh, PBRMaterial& boatMaterial);
+struct BoatParts {
+    Node* hull = nullptr;
+    Node* boom = nullptr;
+};
+
+BoatParts buildBoat(Node& root, GPUMesh& hullMesh, GPUMesh& deckMesh, GPUMesh& boxMesh, GPUMesh& sailMesh,
+    PBRMaterial& hullMaterial, PBRMaterial& deckMaterial, PBRMaterial& mastMaterial, PBRMaterial& sailMaterial);
+
+void setBoomAngle(Node& boom, float degrees);
+void setPitchAngle(Node& hull, float degrees);
 
 Mesh makeHull();
-
+Mesh makeDeck();
+Mesh makeSail();
 Mesh makeUnitBox();
