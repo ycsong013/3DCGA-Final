@@ -36,6 +36,7 @@ uniform sampler2D brdfMap;
 in vec3 fragPosition;
 in vec3 fragNormal;
 in vec2 fragTexCoord;
+in mat3 fragTBN;
 
 layout(location = 0) out vec4 fragColor;
 
@@ -98,7 +99,9 @@ void main()
         // Albedos found online are usually given the sRGB space. To convert
         // them to the linear space, LearnOpenGL mentioned that we need to take its power to 2.2.
         vec3 albedo = pow(texture(textureAlbedo, fragTexCoord).rgb, vec3(2.2));
-        // normal = normalize(texture(textureNormal, fragTexCoord).xyz); // Note to Yamaç: This will NOT give you the normal yet. Check the normal mapping lecture.
+        normal = texture(textureNormal, fragTexCoord).xyz;
+        normal = normal * 2.0 - 1.0;
+        normal = normalize(fragTBN * normal);   
         float metallic = texture(textureMetallic, fragTexCoord).x;
         float roughness = texture(textureRoughness, fragTexCoord).x; 
         float ambientOcclusion = texture(textureAO, fragTexCoord).x;

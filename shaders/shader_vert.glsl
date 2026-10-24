@@ -9,10 +9,13 @@ uniform mat3 normalModelMatrix;
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 texCoord;
+layout(location = 3) in vec3 tangent;
+layout(location = 4) in vec3 bitangent;
 
 out vec3 fragPosition;
 out vec3 fragNormal;
 out vec2 fragTexCoord;
+out mat3 fragTBN;
 
 void main()
 {
@@ -21,4 +24,11 @@ void main()
     fragPosition    = (modelMatrix * vec4(position, 1)).xyz;
     fragNormal      = normalModelMatrix * normal;
     fragTexCoord    = texCoord;
+
+    // I'm not sure if we should use the model matrix or the normal model matrix here, and I couldn't find much on the internet.
+    // So I'm using this instead.
+    vec3 fragT = normalModelMatrix * tangent;
+    vec3 fragB = normalModelMatrix * bitangent;
+
+    fragTBN = mat3(fragT, fragB, fragNormal);
 }
