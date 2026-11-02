@@ -127,6 +127,7 @@ public:
             ImGui::SliderAngle("The Sun's Azimuth", &m_sunAzimuth, 0.0f, 360.0f);
             ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
             ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 10.0f);
+            ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
 
 
             const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
@@ -294,6 +295,7 @@ private:
     float m_sunAzimuth = 0.0f;
     float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
     // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
+    glm::vec3 m_lightColor;
 
     // Shader for default rendering and for depth rendering
     Shader m_defaultShader;
@@ -359,7 +361,7 @@ private:
         glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
         glUniform1i(m_defaultShader.getUniformLocation("useIBL"), m_useIBL);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
-        glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f))); // Assume white light
+        glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
         glUniform3fv(m_defaultShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
         glUniform3fv(m_defaultShader.getUniformLocation("sunDirection"), 1, glm::value_ptr(sunDirection));
         glUniform1i(m_defaultShader.getUniformLocation("useNormalMap"), m_useNormalMaps);
