@@ -23,7 +23,7 @@ uniform vec3 lightPosition;
 uniform vec3 cameraPosition;
 uniform vec3 lightColor;
 uniform bool useIBL; // If we use IBL or not (environment mapping)
-uniform int usePBR;
+uniform bool usePBR;
 uniform vec3 sunDirection;
 uniform float sunIntensity;
 
@@ -96,7 +96,7 @@ void main()
 
     if (hasTexCoords)       { 
 
-        if (usePBR == 0) {
+        if (!usePBR) {
         fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
         }
         else {

@@ -117,6 +117,7 @@ public:
 
             ImGui::Checkbox("Use Normal Maps Of the Textures", &m_useNormalMaps);
             ImGui::Checkbox("Use Image Based Lighting", &m_useIBL);
+            ImGui::Checkbox("Use Physically Based Rendering", &m_usePBR);
             ImGui::Checkbox("Use the Sun as a Directional Light", &m_useDirectionalLight);
             
             // In this mathematics forum, I saw that the sun's position is generally coded as an "azimuth" 
@@ -279,6 +280,7 @@ private:
     bool m_showPath = false;
     bool m_useNormalMaps = false;
     bool m_useIBL = false;
+    bool m_usePBR = false;
     bool m_useDirectionalLight = false;
     bool m_wireframe = false;
     bool m_animateBoat = false;
@@ -373,7 +375,7 @@ private:
             };
             material->bind(textureSlots);
             glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_TRUE);
-            glUniform1i(m_defaultShader.getUniformLocation("usePBR"), 1);
+            glUniform1i(m_defaultShader.getUniformLocation("usePBR"), m_usePBR);
             glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), GL_FALSE);
             glUniform1i(m_defaultShader.getUniformLocation("textureAlbedo"), 2);
             glUniform1i(m_defaultShader.getUniformLocation("textureAO"), 3);
