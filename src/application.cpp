@@ -115,6 +115,20 @@ public:
                 ImGui::SliderFloat("Speed", &m_speed, 0.0f, 30.0f);
             }
 
+            ImGui::Checkbox("Use Normal Maps Of the Textures", &m_useNormalMaps);
+            ImGui::Checkbox("Use Image Based Lighting", &m_useIBL);
+            ImGui::Checkbox("Use the Sun as a Directional Light", &m_useDirectionalLight);
+            
+            // In this mathematics forum, I saw that the sun's position is generally coded as an "azimuth" 
+            // and an "elevation". Thus, instead of letting the user set the XYZ coordinates of the sun's direction,
+            // it would be more in line for them to set the azimuth and the elevation and then
+            // calculate the XYZ later. This forum shows how to do it: https://math.stackexchange.com/questions/4697069/calculate-cartesian-angle-from-suns-azimuth-and-elevation
+
+            ImGui::SliderAngle("The Sun's Azimuth", &m_sunAzimuth, 0.0f, 360.0f);
+            ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
+            ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 10.0f);
+
+
             const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
             ImGui::Combo("Camera Mode", &m_cameraMode, cameraModes, IM_ARRAYSIZE(cameraModes));
             if (m_cameraMode == Aerial) {
@@ -262,6 +276,9 @@ private:
     // Tools for debugging
     bezierPath m_path;
     bool m_showPath = false;
+    bool m_useNormalMaps = false;
+    bool m_useIBL = false;
+    bool m_useDirectionalLight = false;
     bool m_wireframe = false;
     bool m_animateBoat = false;
     enum CameraMode { Aerial = 0, Top = 1, Third = 2 };
@@ -272,6 +289,11 @@ private:
     double m_lastTime = 0.0;
     float m_speed = 0.3f; // unit: segments/second
     float m_curPosOnPath = 0.0f; // range: [0, 3), representing current position on the path
+
+    float m_sunElevation = 0.0f;
+    float m_sunAzimuth = 0.0f;
+    float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
+    // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
 
     // Shader for default rendering and for depth rendering
     Shader m_defaultShader;
@@ -287,6 +309,7 @@ private:
     glm::mat4 m_viewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0), glm::vec3(0, 1, 0));
     glm::mat4 m_modelMatrix { 1.0f };
     glm::vec3 cameraPosition;
+    glm::vec3 sunDirection;
 
     // Meshes for building the boat
     GPUMesh m_hullMesh;
@@ -316,6 +339,13 @@ private:
         // https://paroj.github.io/gltut/Illumination/Tut09%20Normal%20Transformation.html
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(model));
 
+        // I use the azimuth-elevation to cartesian conversion formula introduced in this 
+        // math forum: https://math.stackexchange.com/questions/4697069/calculate-cartesian-angle-from-suns-azimuth-and-elevation
+        // The answer in this forum is a bit different: OP's cartesian coordinate system puts z to be the "up" direction, whereas in OpenGL this is the "y" direction.
+        // So I swapped those two directions here.
+
+        sunDirection = glm::vec3(glm::cos(m_sunElevation) * glm::sin(m_sunAzimuth), glm::sin(m_sunElevation), glm::cos(m_sunElevation) * glm::cos(m_sunAzimuth));
+
         m_defaultShader.bind();
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
         //Uncomment this line when you use the modelMatrix (or fragmentPosition)
@@ -327,17 +357,20 @@ private:
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_defaultShader.getUniformLocation("prefilteredMap"), 7);
         glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
-        glUniform1i(m_defaultShader.getUniformLocation("useIBL"), 1);
+        glUniform1i(m_defaultShader.getUniformLocation("useIBL"), m_useIBL);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
-        glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
+        glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f))); // Assume white light
         glUniform3fv(m_defaultShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
+        glUniform3fv(m_defaultShader.getUniformLocation("sunDirection"), 1, glm::value_ptr(sunDirection));
+        glUniform1i(m_defaultShader.getUniformLocation("useNormalMap"), m_useNormalMaps);
+        glUniform1i(m_defaultShader.getUniformLocation("useDirectionalLight"), m_useDirectionalLight);
+        glUniform1f(m_defaultShader.getUniformLocation("sunIntensity"), m_sunIntensity);
         if (material != nullptr) {
             GLint textureSlots[] = {
                 GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6
             };
             material->bind(textureSlots);
             glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_TRUE);
-            // Is there an easier way of doing this??? Check.
             glUniform1i(m_defaultShader.getUniformLocation("usePBR"), 1);
             glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), GL_FALSE);
             glUniform1i(m_defaultShader.getUniformLocation("textureAlbedo"), 2);
