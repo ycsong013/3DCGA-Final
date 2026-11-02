@@ -32,6 +32,7 @@ public:
         : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
         , m_environment(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
         , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
+        , m_seaMesh(makeGrid(100, 200))
         , m_hullMesh(makeHull())
         , m_deckMesh(makeDeck())
         , m_sailMesh(makeSail())
@@ -53,7 +54,6 @@ public:
         });
 
         //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
-        m_meshes.push_back(makeGrid(100, 200));
         m_boat = buildBoat(m_boatRoot, m_hullMesh, m_deckMesh, m_boxMesh, m_sailMesh,
             m_hullMaterial, m_deckMaterial, m_mastMaterial, m_sailMaterial);
 
@@ -72,6 +72,11 @@ public:
             shadowBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shadow_vert.glsl");
             shadowBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/shadow_frag.glsl");
             m_shadowShader = shadowBuilder.build();
+
+            ShaderBuilder seaBuilder;
+            seaBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/sea_vert.glsl");
+            seaBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/shader_frag.glsl");
+            m_seaShader = seaBuilder.build();
 
             // Any new shaders can be added below in similar fashion.
             // ==> Don't forget to reconfigure CMake when you do!
@@ -188,6 +193,8 @@ public:
                 drawMesh(mesh, m_modelMatrix);
             }
 
+            drawSea(m_seaMesh, m_modelMatrix);
+
             drawNode(m_boatRoot, m_modelMatrix);
 
             if (m_showPath) {
@@ -276,6 +283,7 @@ private:
     // Shader for default rendering and for depth rendering
     Shader m_defaultShader;
     Shader m_shadowShader;
+    Shader m_seaShader;
 
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;
@@ -294,6 +302,7 @@ private:
     GPUMesh m_sailMesh;
     GPUMesh m_boxMesh;
     Node m_boatRoot;
+    GPUMesh m_seaMesh;
 
     // User for setting the angle of the boom and the pitch
     BoatParts m_boat;
@@ -358,6 +367,32 @@ private:
             glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), m_useMaterial);
         }
         mesh.draw(m_defaultShader);
+    }
+
+    void drawSea(GPUMesh& mesh, const glm::mat4& model) {
+
+        const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
+        // Normals should be transformed differently than positions (ignoring translations + dealing with scaling):
+        // https://paroj.github.io/gltut/Illumination/Tut09%20Normal%20Transformation.html
+        const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(model));
+
+        m_seaShader.bind();
+        glUniformMatrix4fv(m_seaShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+        //Uncomment this line when you use the modelMatrix (or fragmentPosition)
+        glUniformMatrix4fv(m_seaShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix3fv(m_seaShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+        glUniform1f(m_seaShader.getUniformLocation("time"), static_cast<float>(glfwGetTime()));
+        m_environment.bindIrradianceMap(GL_TEXTURE1);
+        m_environment.bindPrefilteredMap(GL_TEXTURE7);
+        m_environment.bindBRDFMap(GL_TEXTURE8);
+        glUniform1i(m_seaShader.getUniformLocation("irradianceMap"), 1);
+        glUniform1i(m_seaShader.getUniformLocation("prefilteredMap"), 7);
+        glUniform1i(m_seaShader.getUniformLocation("brdfMap"), 8);
+        glUniform1i(m_seaShader.getUniformLocation("useIBL"), 1);
+        glUniform3fv(m_seaShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
+        glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
+        glUniform3fv(m_seaShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
+        mesh.draw(m_seaShader);
     }
 
     void drawNode(const Node& node, const glm::mat4& parentWorld) {
