@@ -94,7 +94,7 @@ public:
             // Use ImGui for easy input/output of ints, floats, strings, etc...
             ImGui::Begin("Window");
             // ImGui::InputInt("This is an integer input", &dummyInteger); // Use ImGui::DragInt or ImGui::DragFloat for larger range of numbers.
-            // ImGui::Text("Value is: %i", dummyInteger); // Use C printf formatting rules (%i is a signed integer)
+            ImGui::Text("The current time is: %f", currentTime); // Use C printf formatting rules (%i is a signed integer)
             ImGui::Checkbox("Use material if no texture", &m_useMaterial);
             ImGui::Checkbox("Wireframe", &m_wireframe);
 
@@ -130,6 +130,8 @@ public:
             ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 10.0f);
             ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
 
+            ImGui::Checkbox("Use a Day and Night System", &m_dayNightSystem);
+
 
             const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
             ImGui::Combo("Camera Mode", &m_cameraMode, cameraModes, IM_ARRAYSIZE(cameraModes));
@@ -156,6 +158,10 @@ public:
             double now = glfwGetTime(); 
             float interval = static_cast<float>(now - m_lastTime);
             m_lastTime = now;
+            currentTime += interval;
+            if (currentTime > totalTime) {
+                currentTime = 0.0;
+            }
 
             // Calculate boat's current position on the Bezier path
             if (m_animateBoat) {
@@ -336,6 +342,18 @@ private:
     PBRMaterial m_sailMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/coarse-loose-fabric-bl/coarse-loose-fabric_");
     PBRMaterial m_mastMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/bamboo-wood-semigloss-bl/bamboo-wood-semigloss-");
 
+    // Colors for the light of the sun for the "changing lighting conditions" feature
+    // We used the color codes given in this forum question: https://community.khronos.org/t/day-night-cycle-light/57752
+    glm::vec3 morningSun = glm::vec3(255.0, 255.0, 220.0) / 255.0f;
+    glm::vec3 eveningSun = glm::vec3(255.0, 60.0, 60.0) / 255.0f;
+    glm::vec3 nightSun = glm::vec3(20.0, 60.0, 180.0) / 255.0f;
+
+    float currentTime = 0.0f;
+    float sunsetTime = 10.0f;
+    float nightTime = 20.0f;
+    float totalTime = 30.0f;
+    bool m_dayNightSystem = false;
+
     void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
@@ -363,7 +381,19 @@ private:
         glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
         glUniform1i(m_defaultShader.getUniformLocation("useIBL"), m_useIBL);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
-        glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
+        if (m_dayNightSystem && m_useDirectionalLight) {
+            if (currentTime <= sunsetTime) {
+                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
+            }
+            else if (currentTime <= nightTime){
+                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(eveningSun, nightSun, (currentTime - sunsetTime) / (nightTime - sunsetTime))));
+            }
+            else {
+                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(nightSun));
+            }
+        } else {
+            glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
+        }
         glUniform3fv(m_defaultShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
         glUniform3fv(m_defaultShader.getUniformLocation("sunDirection"), 1, glm::value_ptr(sunDirection));
         glUniform1i(m_defaultShader.getUniformLocation("useNormalMap"), m_useNormalMaps);
