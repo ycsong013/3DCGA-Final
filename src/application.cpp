@@ -123,6 +123,7 @@ public:
             ImGui::Text("The current time is: %f", currentTime); // Use C printf formatting rules (%i is a signed integer)
             ImGui::Checkbox("Use material if no texture", &m_useMaterial);
             ImGui::Checkbox("Wireframe", &m_wireframe);
+            ImGui::Checkbox("Minimap", &m_showMinimap);
 
             ImGui::Checkbox("Animate Boom", &m_animateBoom);
             if (m_animateBoom) {
@@ -267,7 +268,6 @@ public:
 
             glViewport(0, 0, 1024, 1024);
 
-
             switch (m_cameraMode) {
                 case Aerial:
                     m_viewMatrix = glm::lookAt(glm::vec3(m_aerialX, m_aerialY, m_aerialZ), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
@@ -289,31 +289,14 @@ public:
                 drawMesh(mesh, m_modelMatrix);
             }
 
-            drawSea(m_seaMesh, m_modelMatrix);
-            drawNode(m_boatRoot, m_modelMatrix);
-
-            if (m_showPath) {
-                // small boxes along the path
-                int numOfBoxes = 100;
-                for (int i = 0; i < numOfBoxes; i++) {
-                    glm::vec3 p, d;
-                    m_path.calcPosAndDir(3.0f * i / numOfBoxes, p, d);
-                    drawMesh(m_boxMesh,
-                        glm::translate(glm::mat4(1.0f), p) *
-                        glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f)));
-                }
-
-                // big boxes for the control point of these Bezier paths
-                const glm::vec3 ctrlPoints[] = { m_path.L0, m_path.L1, m_path.Q1, m_path.Q2, m_path.C1, m_path.C2 };
-                for (const glm::vec3& ctrl : ctrlPoints) {
-                    drawMesh(m_boxMesh,
-                        glm::translate(glm::mat4(1.0f), ctrl) *
-                        glm::scale(glm::mat4(1.0f), glm::vec3(0.3f, 0.3f, 0.3f)));
-                }
-            }
+            renderScene(m_showPath);
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
             m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor, m_dayNightSystem);
+
+            if (m_showMinimap) {
+                drawMinimap();
+            }
 
             // Processes input and swaps the window buffer
             m_window.swapBuffers();
@@ -378,6 +361,7 @@ private:
     bool m_usePBR = false;
     bool m_useDirectionalLight = false;
     bool m_wireframe = false;
+    bool m_showMinimap = false;
 
     // Tools for the camera
     enum CameraMode { Aerial = 0, Top = 1, Third = 2 };
@@ -621,6 +605,69 @@ private:
         for (const auto& child : node.children) {
             drawNodeShadow(*child, world);
         }
+    }
+
+    // Basically the sea, the boat, and the Bezier path
+    void renderScene(bool showPath) {
+        drawSea(m_seaMesh, m_modelMatrix);
+        drawNode(m_boatRoot, m_modelMatrix);
+
+        if (showPath) {
+            // small boxes along the path
+            int numOfBoxes = 100;
+            for (int i = 0; i < numOfBoxes; i++) {
+                glm::vec3 p, d;
+                m_path.calcPosAndDir(3.0f * i / numOfBoxes, p, d);
+                drawMesh(m_boxMesh,
+                    glm::translate(glm::mat4(1.0f), p) *
+                    glm::scale(glm::mat4(1.0f), glm::vec3(0.1f, 0.1f, 0.1f)));
+            }
+
+            // big boxes for the control point of these Bezier paths
+            const glm::vec3 ctrlPoints[] = { m_path.L0, m_path.L1, m_path.Q1, m_path.Q2, m_path.C1, m_path.C2 };
+            for (const glm::vec3& ctrl : ctrlPoints) {
+                drawMesh(m_boxMesh,
+                    glm::translate(glm::mat4(1.0f), ctrl) *
+                    glm::scale(glm::mat4(1.0f), glm::vec3(0.3f, 0.3f, 0.3f)));
+            }
+        }
+
+    }
+
+    void drawMinimap() {
+        // Save original MVP data so we can restore them after drawing the minimap
+        const glm::mat4 originalViewMatrix = m_viewMatrix;
+        const glm::vec3 originalCameraPosition = cameraPosition;
+
+        // The window is 1024 x 1024
+        // The minimap is 256 x 256 with a margin of 10, at the lower right
+        const int mapSize = 1024;
+        const int minimapSize = 256;
+        const int margin = 10;
+        int leftEdge = mapSize - minimapSize - margin;
+        int bottomEdge = margin;
+
+        // Wipe out only the minimap area in the window
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(leftEdge - margin, bottomEdge - margin, minimapSize + 2 * margin, minimapSize + 2 * margin);
+        glClearColor(1.0f, 1.0f, 1.0f, 0.8f); // base color of the minimap
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glViewport(leftEdge, bottomEdge, minimapSize, minimapSize);
+
+        // Set top view
+        m_viewMatrix = glm::lookAt(glm::vec3(0, 10, 0), glm::vec3(0, 0, 0), glm::vec3(0, 0, -1));
+        cameraPosition = glm::vec3(0, 10, 0);
+
+        // Draw minimap and the path of the boat
+        renderScene(true);
+
+        glDisable(GL_SCISSOR_TEST);
+
+        // Restore original MVP data
+        m_viewMatrix = originalViewMatrix;
+        cameraPosition = originalCameraPosition;
+        glViewport(0, 0, mapSize, mapSize);
     }
 };
 
