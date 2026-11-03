@@ -26,6 +26,7 @@ uniform vec3 lightColor;
 uniform bool useIBL; // If we use IBL or not (environment mapping)
 uniform bool usePBR;
 uniform bool dayNightSystem;
+uniform bool useShadows;
 uniform vec3 sunDirection;
 uniform float sunIntensity;
 
@@ -192,7 +193,7 @@ void main()
 
         float shadowFactor = 0.0f;
         // Shadow calculation: (Similar implementation to my answer to assignment 4.)
-        if (useDirectionalLight) {
+        if (useDirectionalLight && useShadows) {
             vec4 fragLightCoord = lightMVPMatrix * vec4(fragPosition, 1.0);
             // Divide by w because fragLightCoord are homogeneous coordinates
             fragLightCoord.xyz /= fragLightCoord.w;

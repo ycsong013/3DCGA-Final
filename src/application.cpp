@@ -145,6 +145,7 @@ public:
             ImGui::Checkbox("Use Image Based Lighting", &m_useIBL);
             ImGui::Checkbox("Use Physically Based Rendering", &m_usePBR);
             ImGui::Checkbox("Use the Sun as a Directional Light", &m_useDirectionalLight);
+            ImGui::Checkbox("Cast Shadows from the Sun", &m_useShadows);
             
             // In this mathematics forum, I saw that the sun's position is generally coded as an "azimuth" 
             // and an "elevation". Thus, instead of letting the user set the XYZ coordinates of the sun's direction,
@@ -446,6 +447,7 @@ private:
     // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
     glm::vec3 m_lightColor = glm::vec3(1.0f);
     float m_sunDistance = 15.0f;
+    bool m_useShadows = false; // Set shadows to false at first.
   
     // Colors for the light of the sun for the "changing lighting conditions" feature
     // We used the color codes given in this forum question: https://community.khronos.org/t/day-night-cycle-light/57752
@@ -500,6 +502,7 @@ private:
         glUniform1i(m_defaultShader.getUniformLocation("shadowMap"), 11);
         glUniform1i(m_defaultShader.getUniformLocation("useIBL"), m_useIBL);
         glUniform1i(m_defaultShader.getUniformLocation("dayNightSystem"), m_dayNightSystem);
+        glUniform1i(m_defaultShader.getUniformLocation("useShadows"), m_useShadows);
         glUniform1f(m_defaultShader.getUniformLocation("interpolationFactor"), interpolationFactor);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         if (m_dayNightSystem && m_useDirectionalLight) {
