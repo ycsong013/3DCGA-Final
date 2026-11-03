@@ -390,7 +390,6 @@ private:
     PBRMaterial m_mastMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/bamboo-wood-semigloss-bl/bamboo-wood-semigloss-");
 
     // Tools for the sun
-    float interpolationFactor = 0.0f;
     float m_sunElevation = 0.0f;
     float m_sunAzimuth = 0.0f;
     float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
@@ -409,6 +408,7 @@ private:
     float sunriseTime = 30.0f;
     float totalTime = 40.0f;
     bool m_dayNightSystem = false;
+    float interpolationFactor = 0.0f;
 
     void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
 
@@ -514,13 +514,16 @@ private:
         m_environment->bindIrradianceMap(GL_TEXTURE1);
         m_environment->bindPrefilteredMap(GL_TEXTURE7);
         m_environment->bindBRDFMap(GL_TEXTURE8);
+        m_night.bindPrefilteredMap(GL_TEXTURE10);
         glUniform1i(m_seaShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_seaShader.getUniformLocation("prefilteredMap"), 7);
+        glUniform1i(m_seaShader.getUniformLocation("prefilteredMapNight"), 10);
         glUniform1i(m_seaShader.getUniformLocation("brdfMap"), 8);
         glUniform1i(m_seaShader.getUniformLocation("useIBL"), 1);
         glUniform3fv(m_seaShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
         glUniform3fv(m_seaShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
+        glUniform1f(m_seaShader.getUniformLocation("interpolationFactor"), m_dayNightSystem ? interpolationFactor : 0.0f);
         mesh.draw(m_seaShader);
     }
 
