@@ -571,15 +571,37 @@ private:
         m_environment->bindPrefilteredMap(GL_TEXTURE7);
         m_environment->bindBRDFMap(GL_TEXTURE8);
         m_night.bindPrefilteredMap(GL_TEXTURE10);
+        glActiveTexture(GL_TEXTURE11);
+        glBindTexture(GL_TEXTURE_2D, texShadow);
         glUniform1i(m_seaShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_seaShader.getUniformLocation("prefilteredMap"), 7);
         glUniform1i(m_seaShader.getUniformLocation("prefilteredMapNight"), 10);
+        glUniform1i(m_seaShader.getUniformLocation("shadowMap"), 11);
         glUniform1i(m_seaShader.getUniformLocation("brdfMap"), 8);
         glUniform1i(m_seaShader.getUniformLocation("useIBL"), 1);
         glUniform3fv(m_seaShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
         glUniform3fv(m_seaShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
         glUniform1f(m_seaShader.getUniformLocation("interpolationFactor"), m_dayNightSystem ? interpolationFactor : 0.0f);
+                if (m_dayNightSystem && m_useDirectionalLight) {
+            if (currentTime <= sunsetTime) {
+                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
+            }
+            else if (currentTime <= nightTime){
+                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(eveningSun, nightSun, (currentTime - sunsetTime) / (nightTime - sunsetTime))));
+            }
+            else {
+                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(nightSun));
+            }
+        } else {
+            glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
+        }
+        glUniform3fv(m_seaShader.getUniformLocation("sunDirection"), 1, glm::value_ptr(sunDirection));
+        glUniform1i(m_seaShader.getUniformLocation("useDirectionalLight"), m_useDirectionalLight);
+        glUniform1f(m_seaShader.getUniformLocation("sunIntensity"), m_sunIntensity);
+        glUniformMatrix4fv(m_seaShader.getUniformLocation("lightMVPMatrix"), 1, GL_FALSE, glm::value_ptr(m_lightMVPMatrix));
+        glUniform1i(m_seaShader.getUniformLocation("useShadows"), m_useShadows);
+        glUniform1i(m_seaShader.getUniformLocation("dayNightSystem"), m_dayNightSystem);
         mesh.draw(m_seaShader);
     }
 
