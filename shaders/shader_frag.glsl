@@ -15,13 +15,19 @@ layout(std140) uniform Material // Must match the GPUMaterial defined in src/mes
 
 uniform sampler2D colorMap;
 uniform samplerCube irradianceMap;
+uniform samplerCube irradianceMapNight;
 uniform bool hasTexCoords;
 uniform bool useMaterial;
+uniform bool useNormalMap; // If we use the normal mapping or not (minimal feature)
+uniform bool useDirectionalLight; // If we use the "sun" or not.
 uniform vec3 lightPosition;
 uniform vec3 cameraPosition;
 uniform vec3 lightColor;
-uniform int useIBL; // If we use IBL or not (environment mapping)
-uniform int usePBR;
+uniform bool useIBL; // If we use IBL or not (environment mapping)
+uniform bool usePBR;
+uniform bool dayNightSystem;
+uniform vec3 sunDirection;
+uniform float sunIntensity;
 
 // Texture-based information
 uniform sampler2D textureAlbedo;
@@ -31,7 +37,10 @@ uniform sampler2D textureRoughness;
 uniform sampler2D textureAO;
 
 uniform samplerCube prefilteredMap;
+uniform samplerCube prefilteredMapNight;
 uniform sampler2D brdfMap;
+
+uniform float interpolationFactor;
 
 in vec3 fragPosition;
 in vec3 fragNormal;
@@ -54,7 +63,7 @@ float NDF(float pi, float roughness, vec3 normal, vec3 halfwayVector) {
 // As LearnOpenGL mentions, this function is based on the Schlick-GGX and the Smith method.
 float geometryFunction(float roughness, vec3 normal, vec3 fragToCamera, vec3 fragToLight) {
     float k;
-    if (useIBL == 0) {
+    if (!useIBL) {
         // No IBL is used
         k = pow(roughness + 1, 2) / 8;
     } else {
@@ -92,26 +101,40 @@ void main()
 
     if (hasTexCoords)       { 
 
-        if (usePBR == 0) {
+        if (!usePBR) {
         fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
         }
         else {
         // Albedos found online are usually given the sRGB space. To convert
         // them to the linear space, LearnOpenGL mentioned that we need to take its power to 2.2.
         vec3 albedo = pow(texture(textureAlbedo, fragTexCoord).rgb, vec3(2.2));
-        normal = texture(textureNormal, fragTexCoord).xyz;
-        normal = normal * 2.0 - 1.0;
-        normal = normalize(fragTBN * normal);   
+        if (useNormalMap) { // Use the normal map of the texture instead if the user checks the box.
+            normal = texture(textureNormal, fragTexCoord).xyz;
+            normal = normal * 2.0 - 1.0;
+            normal = normalize(fragTBN * normal); 
+        }  
         float metallic = texture(textureMetallic, fragTexCoord).x;
         float roughness = texture(textureRoughness, fragTexCoord).x; 
         float ambientOcclusion = texture(textureAO, fragTexCoord).x;
 
         vec3 fragToLight = normalize(lightPosition - fragPosition);
+        if (useDirectionalLight) {
+            fragToLight = normalize(sunDirection); // The cartesian coordinate calculation in the application file already
+            // calculates the sun direction FROM the surface. Thus, unlike normal directional lights, the direction does not
+            // need to be reversed.
+        }
         vec3 fragToCamera = normalize(cameraPosition - fragPosition);
         vec3 halfwayVector = (fragToLight + fragToCamera) / length((fragToLight + fragToCamera));
 
-        float fragToLightDistance = length(lightPosition - fragPosition);
-        vec3 lightRadiance = lightColor / (fragToLightDistance * fragToLightDistance);
+        vec3 lightRadiance;
+        if (useDirectionalLight) {
+            lightRadiance = lightColor * sunIntensity; // As the sun is infinitely far away, it cannot be attenuated by the distance.
+            // Thus, We decided that the users could set a light intensity instead.
+        }
+        else {
+            float fragToLightDistance = length(lightPosition - fragPosition);
+            lightRadiance = lightColor / (fragToLightDistance * fragToLightDistance);
+        }
 
         vec3 F0 = vec3(0.04); // LearnOpenGL mentions that we can approximate the F0 of dielectric materials as a vector of 0.4s.
         F0 = mix(F0, albedo, metallic); // For metallic surfaces, the F0 value is changed using linear interpolation.
@@ -130,18 +153,33 @@ void main()
         vec3 outgoingRadiance = (kD * (albedo / pi) + ((ndf * geometry * kS) / (4 * max(dot(normal, fragToCamera), 0.0) * cosTheta + 0.0001))) * lightRadiance * cosTheta;
 
         vec3 ambient;
-        if (useIBL == 0) {
+        if (!useIBL) {
             ambient = vec3(0.03) * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
         }
         else { // If IBL is used, use the lighting reflected from the environment as the ambient term instead.
-            vec3 irradiance = texture(irradianceMap, normal).xyz;
+            vec3 irradiance;
+            if (dayNightSystem) {
+                vec3 irradianceDay = texture(irradianceMap, normal).xyz;
+                vec3 irradianceNight = texture(irradianceMapNight, normal).xyz;
+                irradiance = mix(irradianceDay, irradianceNight, interpolationFactor);
+            } else {
+                irradiance = texture(irradianceMap, normal).xyz;
+            }
             vec3 IBLkS = fresnelWithRoughness(normal, fragToCamera, F0, roughness);
             vec3 IBLkD = vec3(1.0) - IBLkS;
 
             IBLkD *= (1.0 - metallic);
 
             vec3 reflectedLight = reflect(-fragToCamera, normal);
-            vec3 prefilterColor = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz; // 4 is used here because the prefiltered map contains 4 mipmap levels, ensuring that it doesn't go above 4
+            vec3 prefilterColor;
+            if (dayNightSystem) {
+                vec3 prefilterColorDay = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz; // 4 is used here because the prefiltered map contains 4 mipmap levels, ensuring that it doesn't go above 4
+                vec3 prefilterColorNight = textureLod(prefilteredMapNight, reflectedLight, roughness * 4).xyz;
+                prefilterColor = mix(prefilterColorDay, prefilterColorNight, interpolationFactor);
+            }
+            else {
+                prefilterColor = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz;
+            }
             vec2 brdfResult = texture(brdfMap, vec2(max(dot(normal, fragToCamera), 0.0), roughness)).xy;
 
             vec3 specularLight = prefilterColor * (IBLkS * brdfResult.x + brdfResult.y);
