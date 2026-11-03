@@ -33,6 +33,7 @@ public:
         , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
         , m_day(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
         , m_night(RESOURCE_ROOT "resources/hdris/NightSkyHDRI003_4K_HDR.hdr")
+        , m_seaMesh(makeGrid(100, 200))
         , m_hullMesh(makeHull())
         , m_deckMesh(makeDeck())
         , m_sailMesh(makeSail())
@@ -54,7 +55,6 @@ public:
         });
 
         //m_meshes = GPUMesh::loadMeshGPU(RESOURCE_ROOT "resources/dragon.obj");
-        m_meshes.push_back(makeGrid(100, 200));
         m_boat = buildBoat(m_boatRoot, m_hullMesh, m_deckMesh, m_boxMesh, m_sailMesh,
             m_hullMaterial, m_deckMaterial, m_mastMaterial, m_sailMaterial);
 
@@ -73,6 +73,11 @@ public:
             shadowBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shadow_vert.glsl");
             shadowBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/shadow_frag.glsl");
             m_shadowShader = shadowBuilder.build();
+
+            ShaderBuilder seaBuilder;
+            seaBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/sea_vert.glsl");
+            seaBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/sea_frag.glsl");
+            m_seaShader = seaBuilder.build();
 
             // Any new shaders can be added below in similar fashion.
             // ==> Don't forget to reconfigure CMake when you do!
@@ -113,7 +118,7 @@ public:
 
             ImGui::Checkbox("Animate Boat", &m_animateBoat);
             if (m_animateBoat) {
-                ImGui::SliderFloat("Speed", &m_speed, 0.0f, 30.0f);
+                ImGui::SliderFloat("Speed", &m_speed, 0.0f, 1.0f);
             }
 
             ImGui::Checkbox("Use Normal Maps Of the Textures", &m_useNormalMaps);
@@ -138,9 +143,20 @@ public:
             ImGui::Combo("Camera Mode", &m_cameraMode, cameraModes, IM_ARRAYSIZE(cameraModes));
             if (m_cameraMode == Aerial) {
                 ImGui::SliderFloat("Aerial view X", &m_aerialX, 0.0f, 10.0f);
-                ImGui::SliderFloat("Aerial view Y", &m_aerialY, 0.0f, 10.0f);
+                ImGui::SliderFloat("Aerial view Y", &m_aerialY, 0.0f, 5.0f);
                 ImGui::SliderFloat("Aerial view Z", &m_aerialZ, 0.0f, 10.0f);
             }
+
+            // k = 2 * pi / wavelength, so wavelength cannot be 0
+            ImGui::SliderFloat("Amplitude of wave +x+z", &m_amp1, 0.0f, 0.1f);
+            ImGui::SliderFloat("Wavelength of wave +x+z", &m_wav1, 3.0f, 5.0f);
+            ImGui::SliderFloat("Speed of wave +x+z", &m_spe1, 0.0f, 5.0f);
+            ImGui::SliderFloat("Amplitude of wave -x+z", &m_amp2, 0.0f, 0.1f);
+            ImGui::SliderFloat("Wavelength of wave -x+z", &m_wav2, 3.0f, 5.0f);
+            ImGui::SliderFloat("Speed of wave -x+z", &m_spe2, 0.0f, 5.0f);
+            ImGui::SliderFloat("Amplitude of wave -z", &m_amp3, 0.0f, 0.1f);
+            ImGui::SliderFloat("Wavelength of wave -z", &m_wav3, 3.0f, 5.0f);
+            ImGui::SliderFloat("Speed of wave -z", &m_spe3, 0.0f, 5.0f);
 
             ImGui::End();
 
@@ -216,8 +232,8 @@ public:
                     cameraPosition = glm::vec3(0, 10, 0);
                     break;
                 case Third:
-                    m_viewMatrix = glm::lookAt(pos - 4.0f * dir + glm::vec3(0, 4, 0), pos, glm::vec3(0, 1, 0));
-                    cameraPosition = glm::vec3(pos - 4.0f * dir + glm::vec3(0, 4, 0));
+                    m_viewMatrix = glm::lookAt(pos - 5.0f * dir + glm::vec3(0, 1, 0), pos, glm::vec3(0, 1, 0));
+                    cameraPosition = glm::vec3(pos - 5.0f * dir + glm::vec3(0, 1, 0));
                     break;
                 default:
                     break;
@@ -227,6 +243,7 @@ public:
                 drawMesh(mesh, m_modelMatrix);
             }
 
+            drawSea(m_seaMesh, m_modelMatrix);
             drawNode(m_boatRoot, m_modelMatrix);
 
             if (m_showPath) {
@@ -298,33 +315,43 @@ public:
 private:
     Window m_window;
 
+    // Wave atributes for the shader: 1 for (+x, +z), 2 for (-x, +z), 3 for (0, -z)
+    float m_amp1 = 0.05f;
+    float m_wav1 = 4.0f;
+    float m_spe1 = 1.0f;
+    float m_amp2 = 0.05f;
+    float m_wav2 = 4.0f;
+    float m_spe2 = 1.0f;
+    float m_amp3 = 0.05f;
+    float m_wav3 = 4.0f;
+    float m_spe3 = 1.0f;
+
     // Tools for debugging
-    bezierPath m_path;
-    bool m_showPath = false;
     bool m_useNormalMaps = false;
     bool m_useIBL = false;
     bool m_usePBR = false;
     bool m_useDirectionalLight = false;
     bool m_wireframe = false;
-    bool m_animateBoat = false;
+
+    // Tools for the camera
     enum CameraMode { Aerial = 0, Top = 1, Third = 2 };
     int m_cameraMode = Aerial;
-    float m_aerialX = 3;
-    float m_aerialY = 3;
-    float m_aerialZ = 3;
+    float m_aerialX = 8;
+    float m_aerialY = 2;
+    float m_aerialZ = 8;
+
+    // Tools for the Bezier path
+    bezierPath m_path;
+    bool m_showPath = false;
+    bool m_animateBoat = false;
     double m_lastTime = 0.0;
     float m_speed = 0.3f; // unit: segments/second
     float m_curPosOnPath = 0.0f; // range: [0, 3), representing current position on the path
-    float interpolationFactor = 0.0f;
-    float m_sunElevation = 0.0f;
-    float m_sunAzimuth = 0.0f;
-    float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
-    // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
-    glm::vec3 m_lightColor = glm::vec3(1.0f);
 
     // Shader for default rendering and for depth rendering
     Shader m_defaultShader;
     Shader m_shadowShader;
+    Shader m_seaShader;
 
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;
@@ -340,7 +367,8 @@ private:
     glm::vec3 cameraPosition;
     glm::vec3 sunDirection;
 
-    // Meshes for building the boat
+    // Meshes for the project
+    GPUMesh m_seaMesh;
     GPUMesh m_hullMesh;
     GPUMesh m_deckMesh;
     GPUMesh m_sailMesh;
@@ -361,6 +389,14 @@ private:
     PBRMaterial m_sailMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/coarse-loose-fabric-bl/coarse-loose-fabric_");
     PBRMaterial m_mastMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/bamboo-wood-semigloss-bl/bamboo-wood-semigloss-");
 
+    // Tools for the sun
+    float interpolationFactor = 0.0f;
+    float m_sunElevation = 0.0f;
+    float m_sunAzimuth = 0.0f;
+    float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
+    // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
+    glm::vec3 m_lightColor = glm::vec3(1.0f);
+  
     // Colors for the light of the sun for the "changing lighting conditions" feature
     // We used the color codes given in this forum question: https://community.khronos.org/t/day-night-cycle-light/57752
     glm::vec3 morningSun = glm::vec3(255.0, 255.0, 220.0) / 255.0f;
@@ -451,6 +487,41 @@ private:
             glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), m_useMaterial);
         }
         mesh.draw(m_defaultShader);
+    }
+
+    void drawSea(GPUMesh& mesh, const glm::mat4& model) {
+
+        const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
+        // Normals should be transformed differently than positions (ignoring translations + dealing with scaling):
+        // https://paroj.github.io/gltut/Illumination/Tut09%20Normal%20Transformation.html
+        const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(model));
+
+        m_seaShader.bind();
+        glUniformMatrix4fv(m_seaShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
+        //Uncomment this line when you use the modelMatrix (or fragmentPosition)
+        glUniformMatrix4fv(m_seaShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
+        glUniformMatrix3fv(m_seaShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+        glUniform1f(m_seaShader.getUniformLocation("time"), static_cast<float>(glfwGetTime()));
+        glUniform1f(m_seaShader.getUniformLocation("amp1"), m_amp1);
+        glUniform1f(m_seaShader.getUniformLocation("wav1"), m_wav1);
+        glUniform1f(m_seaShader.getUniformLocation("spe1"), m_spe1);
+        glUniform1f(m_seaShader.getUniformLocation("amp2"), m_amp2);
+        glUniform1f(m_seaShader.getUniformLocation("wav2"), m_wav2);
+        glUniform1f(m_seaShader.getUniformLocation("spe2"), m_spe2);
+        glUniform1f(m_seaShader.getUniformLocation("amp3"), m_amp3);
+        glUniform1f(m_seaShader.getUniformLocation("wav3"), m_wav3);
+        glUniform1f(m_seaShader.getUniformLocation("spe3"), m_spe3);
+        m_environment.bindIrradianceMap(GL_TEXTURE1);
+        m_environment.bindPrefilteredMap(GL_TEXTURE7);
+        m_environment.bindBRDFMap(GL_TEXTURE8);
+        glUniform1i(m_seaShader.getUniformLocation("irradianceMap"), 1);
+        glUniform1i(m_seaShader.getUniformLocation("prefilteredMap"), 7);
+        glUniform1i(m_seaShader.getUniformLocation("brdfMap"), 8);
+        glUniform1i(m_seaShader.getUniformLocation("useIBL"), 1);
+        glUniform3fv(m_seaShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
+        glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
+        glUniform3fv(m_seaShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
+        mesh.draw(m_seaShader);
     }
 
     void drawNode(const Node& node, const glm::mat4& parentWorld) {

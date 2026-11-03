@@ -20,7 +20,7 @@ DISABLE_WARNINGS_POP()
 
 Mesh makeGrid(float size, int resolution) {
     // The complete grid is size * size
-    // res * res small squares, each square is 2 triangles
+    // It has resolution * resolution small squares, each square is 2 triangles
     Mesh mesh;
 
     const auto idx = static_cast<glm::uint>(mesh.vertices.size());
