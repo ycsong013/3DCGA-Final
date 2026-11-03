@@ -39,6 +39,8 @@ uniform sampler2D textureAO;
 uniform samplerCube prefilteredMap;
 uniform samplerCube prefilteredMapNight;
 uniform sampler2D brdfMap;
+uniform sampler2D shadowMap;
+uniform mat4 lightMVPMatrix;
 
 uniform float interpolationFactor;
 
@@ -97,7 +99,6 @@ void main()
 {
     float pi = radians(180.0); // Needed for the BRDF.
     vec3 normal = normalize(fragNormal);
-
 
     if (hasTexCoords)       { 
 
@@ -188,7 +189,29 @@ void main()
 
 
         }
-        vec3 color = ambient + outgoingRadiance;
+
+        float shadowFactor = 0.0f;
+        // Shadow calculation: (Similar implementation to my answer to assignment 4.)
+        if (useDirectionalLight) {
+            vec4 fragLightCoord = lightMVPMatrix * vec4(fragPosition, 1.0);
+            // Divide by w because fragLightCoord are homogeneous coordinates
+            fragLightCoord.xyz /= fragLightCoord.w;
+            // The resulting value is in NDC space (-1 to +1),
+            //  we transform them to texture space (0 to 1).
+            fragLightCoord.xyz = fragLightCoord.xyz * 0.5 + 0.5;
+            // Depth of the fragment with respect to the light
+            float fragLightDepth = fragLightCoord.z;
+            // Shadow map coordinate corresponding to this fragment
+            vec2 shadowMapCoord = fragLightCoord.xy;
+            // Shadow map value from the corresponding shadow map position
+            float shadowMapDepth = texture(shadowMap, shadowMapCoord).x;
+
+            if (shadowMapDepth + 0.01 < fragLightDepth) {
+                shadowFactor = 1.0f; // in shadow
+            } 
+        }
+
+        vec3 color = ambient + (1 - shadowFactor) * outgoingRadiance;
 
         // Finally, implement gamma correcting for more realistic colors to the eye:
 

@@ -84,6 +84,26 @@ public:
             //     Visual Studio: PROJECT => Generate Cache for ComputerGraphics
             //     VS Code: ctrl + shift + p => CMake: Configure => enter
             // ....
+            // Shadow texture initialization (This part was coded from my knowledge of assignment 4.)
+            glGenTextures(1, &texShadow);
+            glBindTexture(GL_TEXTURE_2D, texShadow);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+            glBindTexture(GL_TEXTURE_2D, 0);
+
+            glGenFramebuffers(1, &shadowFrameBuffer);
+            glBindFramebuffer(GL_FRAMEBUFFER, shadowFrameBuffer);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texShadow, 0);
+            glDrawBuffer(GL_NONE);
+            glReadBuffer(GL_NONE);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
         } catch (ShaderLoadingException e) {
             std::cerr << e.what() << std::endl;
         }
@@ -135,6 +155,7 @@ public:
             ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
             ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 10.0f);
             ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
+            ImGui::SliderFloat("The Sun's Distance (Shadow Mapping)",&m_sunDistance, 5.0f, 30.0f);
 
             ImGui::Checkbox("Use a Day and Night System", &m_dayNightSystem);
 
@@ -195,7 +216,6 @@ public:
                 interpolationFactor = 1 - ((currentTime - sunriseTime) / (totalTime - sunriseTime));
                 }
             }
-
             // Calculate boat's current position on the Bezier path
             if (m_animateBoat) {
                 m_curPosOnPath = std::fmod(m_curPosOnPath + m_speed * interval, 3.0f);
@@ -220,6 +240,31 @@ public:
                 m_pitchTime += interval;
             }
             setPitchAngle(*m_boat.hull, 15.0f * std::sin(m_pitchSpeed / 15.0f * m_pitchTime * static_cast<float>(std::numbers::pi) / 2.0f));
+
+            // Set the sun's direction to be the user defined direction.
+            sunDirection = glm::vec3(glm::cos(m_sunElevation) * glm::sin(m_sunAzimuth), glm::sin(m_sunElevation), glm::cos(m_sunElevation) * glm::cos(m_sunAzimuth));
+
+            // Normally, directional lights do not have a position. However, for rendering shadows, LearnOpenGL
+            // adds that we MUST still set a position. We assume that this is a position focused on the boat.
+            glm::vec3 sunTarget = pos; // Set the target of the sun as the position of the boat.
+            glm::vec3 sunPosition = sunTarget + sunDirection * m_sunDistance; 
+            m_lightViewMatrix = glm::lookAt(sunPosition, sunTarget, glm::vec3(0, 1, 0));
+            m_lightProjectionMatrix = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, m_sunDistance - 10.0f, m_sunDistance + 10.0f); // the 10 is a randomly set value, the near and far planes depend on the sun's distance though.
+            m_lightMVPMatrix = m_lightProjectionMatrix * m_lightViewMatrix;
+
+
+            // Render the shadow map:
+
+            glBindFramebuffer(GL_FRAMEBUFFER, shadowFrameBuffer);
+            glClearDepth(1.0);
+            glClear(GL_DEPTH_BUFFER_BIT);
+            glEnable(GL_DEPTH_TEST);
+            
+            drawNodeShadow(m_boatRoot, m_modelMatrix); // Calculate the shadows for the boat.
+            // Bind the shadow shader and send the required values
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            glViewport(0, 0, 1024, 1024);
 
 
             switch (m_cameraMode) {
@@ -363,7 +408,11 @@ private:
     // Projection and view matrices for you to fill in and use
     glm::mat4 m_projectionMatrix = glm::perspective(glm::radians(80.0f), 1.0f, 0.1f, 30.0f);
     glm::mat4 m_viewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0), glm::vec3(0, 1, 0));
+    glm::mat4 m_lightViewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0), glm::vec3(0, 1, 0));
+    glm::mat4 m_lightProjectionMatrix = glm::perspective(glm::radians(80.0f), 1.0f, 0.1f, 30.0f); // LearnOpenGL mentions that the projection matrix
+    // for directional light sources must be different.
     glm::mat4 m_modelMatrix { 1.0f };
+    glm::mat4 m_lightMVPMatrix;
     glm::vec3 cameraPosition;
     glm::vec3 sunDirection;
 
@@ -396,6 +445,7 @@ private:
     float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
     // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
     glm::vec3 m_lightColor = glm::vec3(1.0f);
+    float m_sunDistance = 15.0f;
   
     // Colors for the light of the sun for the "changing lighting conditions" feature
     // We used the color codes given in this forum question: https://community.khronos.org/t/day-night-cycle-light/57752
@@ -410,6 +460,12 @@ private:
     float totalTime = 40.0f;
     bool m_dayNightSystem = false;
 
+    // Variables for shadow mapping
+    GLuint texShadow;
+    GLuint shadowFrameBuffer;
+    const int SHADOWTEX_WIDTH = 1024;
+    const int SHADOWTEX_HEIGHT = 1024;
+
     void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
@@ -422,23 +478,26 @@ private:
         // The answer in this forum is a bit different: OP's cartesian coordinate system puts z to be the "up" direction, whereas in OpenGL this is the "y" direction.
         // So I swapped those two directions here.
 
-        sunDirection = glm::vec3(glm::cos(m_sunElevation) * glm::sin(m_sunAzimuth), glm::sin(m_sunElevation), glm::cos(m_sunElevation) * glm::cos(m_sunAzimuth));
-
         m_defaultShader.bind();
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
         //Uncomment this line when you use the modelMatrix (or fragmentPosition)
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
+        glUniformMatrix4fv(m_defaultShader.getUniformLocation("lightMVPMatrix"), 1, GL_FALSE, glm::value_ptr(m_lightMVPMatrix));
         m_environment->bindIrradianceMap(GL_TEXTURE1);
         m_environment->bindPrefilteredMap(GL_TEXTURE7);
         m_environment->bindBRDFMap(GL_TEXTURE8);
         m_night.bindIrradianceMap(GL_TEXTURE9);
         m_night.bindPrefilteredMap(GL_TEXTURE10);
+        // Set the shadow map texture.
+        glActiveTexture(GL_TEXTURE11);
+        glBindTexture(GL_TEXTURE_2D, texShadow);
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_defaultShader.getUniformLocation("prefilteredMap"), 7);
         glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMapNight"), 9);
         glUniform1i(m_defaultShader.getUniformLocation("prefilteredMapNight"), 10);
+        glUniform1i(m_defaultShader.getUniformLocation("shadowMap"), 11);
         glUniform1i(m_defaultShader.getUniformLocation("useIBL"), m_useIBL);
         glUniform1i(m_defaultShader.getUniformLocation("dayNightSystem"), m_dayNightSystem);
         glUniform1f(m_defaultShader.getUniformLocation("interpolationFactor"), interpolationFactor);
@@ -489,6 +548,16 @@ private:
         mesh.draw(m_defaultShader);
     }
 
+    void drawMeshShadow(GPUMesh& mesh, const glm::mat4& model) {
+        glm::mat4 lightMVPMatrix = m_lightProjectionMatrix * m_lightViewMatrix * model;
+
+        m_shadowShader.bind();
+        glViewport(0, 0, SHADOWTEX_WIDTH, SHADOWTEX_HEIGHT);
+        glUniformMatrix4fv(m_shadowShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(lightMVPMatrix));
+
+        mesh.draw(m_shadowShader);
+    }
+
     void drawSea(GPUMesh& mesh, const glm::mat4& model) {
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
@@ -533,6 +602,18 @@ private:
 
         for (const auto& child : node.children) {
             drawNode(*child, world);
+        }
+    }
+
+    void drawNodeShadow(const Node& node, const glm::mat4& parentWorld) {
+        glm::mat4 world = parentWorld * node.transform;
+
+        if (node.mesh) {
+            drawMeshShadow(*node.mesh, world * node.meshTransform);
+        }
+
+        for (const auto& child : node.children) {
+            drawNodeShadow(*child, world);
         }
     }
 };
