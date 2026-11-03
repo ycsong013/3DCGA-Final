@@ -9,6 +9,21 @@ uniform mat4 modelMatrix;
 uniform mat3 normalModelMatrix;
 uniform float time;
 
+// Wave attributes of direction +X and +Z
+uniform float amp1;
+uniform float wav1;
+uniform float spe1;
+
+// Wave attributes of direction -X and +Z
+uniform float amp2;
+uniform float wav2;
+uniform float spe2;
+
+// Wave attributes of direction -Z
+uniform float amp3;
+uniform float wav3;
+uniform float spe3;
+
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 texCoord;
@@ -21,15 +36,12 @@ float height(vec2 posXZ, out vec2 gradient) {
 	float h = 0.0;
 	gradient = vec2(0.0);
 
-	const int numOfWaves = 2;
+	const int numOfWaves = 3;
 	// Directions of waves in XZ plane
-	vec2 directions[numOfWaves] = vec2[](normalize(vec2(1, 1)), normalize(vec2(-1, 1)));
-	// Amplitudes of waves
-	float amplitudes[numOfWaves] = float[](0.1, 0.05);
-	// Wavelengths of waves
-	float wavelengths[numOfWaves] = float[](1, 2);
-	// Speeds of waves
-	float speeds[numOfWaves] = float[](1, 1);
+	vec2 directions[numOfWaves] = vec2[](normalize(vec2(1, 1)), normalize(vec2(-1, 1)), normalize(vec2(0, -1)));
+	float amplitudes[numOfWaves] = float[](amp1, amp2, amp3);
+	float wavelengths[numOfWaves] = float[](wav1, wav2, wav3);
+	float speeds[numOfWaves] = float[](spe1, spe2, spe3);
 
 	for (int i = 0; i < numOfWaves; i++) {
 		// wave number

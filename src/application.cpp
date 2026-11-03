@@ -75,7 +75,7 @@ public:
 
             ShaderBuilder seaBuilder;
             seaBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/sea_vert.glsl");
-            seaBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/shader_frag.glsl");
+            seaBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/sea_frag.glsl");
             m_seaShader = seaBuilder.build();
 
             // Any new shaders can be added below in similar fashion.
@@ -117,16 +117,27 @@ public:
 
             ImGui::Checkbox("Animate Boat", &m_animateBoat);
             if (m_animateBoat) {
-                ImGui::SliderFloat("Speed", &m_speed, 0.0f, 30.0f);
+                ImGui::SliderFloat("Speed", &m_speed, 0.0f, 1.0f);
             }
 
             const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
             ImGui::Combo("Camera Mode", &m_cameraMode, cameraModes, IM_ARRAYSIZE(cameraModes));
             if (m_cameraMode == Aerial) {
                 ImGui::SliderFloat("Aerial view X", &m_aerialX, 0.0f, 10.0f);
-                ImGui::SliderFloat("Aerial view Y", &m_aerialY, 0.0f, 10.0f);
+                ImGui::SliderFloat("Aerial view Y", &m_aerialY, 0.0f, 5.0f);
                 ImGui::SliderFloat("Aerial view Z", &m_aerialZ, 0.0f, 10.0f);
             }
+
+            // k = 2 * pi / wavelength, so wavelength cannot be 0
+            ImGui::SliderFloat("Amplitude of wave +x+z", &m_amp1, 0.0f, 0.1f);
+            ImGui::SliderFloat("Wavelength of wave +x+z", &m_wav1, 3.0f, 5.0f);
+            ImGui::SliderFloat("Speed of wave +x+z", &m_spe1, 0.0f, 5.0f);
+            ImGui::SliderFloat("Amplitude of wave -x+z", &m_amp2, 0.0f, 0.1f);
+            ImGui::SliderFloat("Wavelength of wave -x+z", &m_wav2, 3.0f, 5.0f);
+            ImGui::SliderFloat("Speed of wave -x+z", &m_spe2, 0.0f, 5.0f);
+            ImGui::SliderFloat("Amplitude of wave -z", &m_amp3, 0.0f, 0.1f);
+            ImGui::SliderFloat("Wavelength of wave -z", &m_wav3, 3.0f, 5.0f);
+            ImGui::SliderFloat("Speed of wave -z", &m_spe3, 0.0f, 5.0f);
 
             ImGui::End();
 
@@ -182,8 +193,8 @@ public:
                     cameraPosition = glm::vec3(0, 10, 0);
                     break;
                 case Third:
-                    m_viewMatrix = glm::lookAt(pos - 4.0f * dir + glm::vec3(0, 4, 0), pos, glm::vec3(0, 1, 0));
-                    cameraPosition = glm::vec3(pos - 4.0f * dir + glm::vec3(0, 4, 0));
+                    m_viewMatrix = glm::lookAt(pos - 5.0f * dir + glm::vec3(0, 1, 0), pos, glm::vec3(0, 1, 0));
+                    cameraPosition = glm::vec3(pos - 5.0f * dir + glm::vec3(0, 1, 0));
                     break;
                 default:
                     break;
@@ -194,7 +205,6 @@ public:
             }
 
             drawSea(m_seaMesh, m_modelMatrix);
-
             drawNode(m_boatRoot, m_modelMatrix);
 
             if (m_showPath) {
@@ -266,16 +276,31 @@ public:
 private:
     Window m_window;
 
+    // Wave atributes for the shader: 1 for (+x, +z), 2 for (-x, +z), 3 for (0, -z)
+    float m_amp1 = 0.05f;
+    float m_wav1 = 4.0f;
+    float m_spe1 = 1.0f;
+    float m_amp2 = 0.05f;
+    float m_wav2 = 4.0f;
+    float m_spe2 = 1.0f;
+    float m_amp3 = 0.05f;
+    float m_wav3 = 4.0f;
+    float m_spe3 = 1.0f;
+
     // Tools for debugging
-    bezierPath m_path;
-    bool m_showPath = false;
     bool m_wireframe = false;
-    bool m_animateBoat = false;
+
+    // Tools for the camera
     enum CameraMode { Aerial = 0, Top = 1, Third = 2 };
     int m_cameraMode = Aerial;
-    float m_aerialX = 3;
-    float m_aerialY = 3;
-    float m_aerialZ = 3;
+    float m_aerialX = 8;
+    float m_aerialY = 2;
+    float m_aerialZ = 8;
+
+    // Tools for the Bezier path
+    bezierPath m_path;
+    bool m_showPath = false;
+    bool m_animateBoat = false;
     double m_lastTime = 0.0;
     float m_speed = 0.3f; // unit: segments/second
     float m_curPosOnPath = 0.0f; // range: [0, 3), representing current position on the path
@@ -296,13 +321,13 @@ private:
     glm::mat4 m_modelMatrix { 1.0f };
     glm::vec3 cameraPosition;
 
-    // Meshes for building the boat
+    // Meshes for the project
+    GPUMesh m_seaMesh;
     GPUMesh m_hullMesh;
     GPUMesh m_deckMesh;
     GPUMesh m_sailMesh;
     GPUMesh m_boxMesh;
     Node m_boatRoot;
-    GPUMesh m_seaMesh;
 
     // User for setting the angle of the boom and the pitch
     BoatParts m_boat;
@@ -382,6 +407,15 @@ private:
         glUniformMatrix4fv(m_seaShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix3fv(m_seaShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
         glUniform1f(m_seaShader.getUniformLocation("time"), static_cast<float>(glfwGetTime()));
+        glUniform1f(m_seaShader.getUniformLocation("amp1"), m_amp1);
+        glUniform1f(m_seaShader.getUniformLocation("wav1"), m_wav1);
+        glUniform1f(m_seaShader.getUniformLocation("spe1"), m_spe1);
+        glUniform1f(m_seaShader.getUniformLocation("amp2"), m_amp2);
+        glUniform1f(m_seaShader.getUniformLocation("wav2"), m_wav2);
+        glUniform1f(m_seaShader.getUniformLocation("spe2"), m_spe2);
+        glUniform1f(m_seaShader.getUniformLocation("amp3"), m_amp3);
+        glUniform1f(m_seaShader.getUniformLocation("wav3"), m_wav3);
+        glUniform1f(m_seaShader.getUniformLocation("spe3"), m_spe3);
         m_environment.bindIrradianceMap(GL_TEXTURE1);
         m_environment.bindPrefilteredMap(GL_TEXTURE7);
         m_environment.bindBRDFMap(GL_TEXTURE8);
