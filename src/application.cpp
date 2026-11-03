@@ -164,6 +164,22 @@ public:
                 currentTime = 0.0;
             }
 
+            if (currentTime < nightTime) {
+                if (currentTime < sunsetTime) {
+                    interpolationFactor = 0;
+                }
+                else {
+                    interpolationFactor = (currentTime - sunsetTime) / (nightTime - sunsetTime);
+                }
+            }
+            else if (currentTime >= nightTime) {
+                if (currentTime < sunriseTime) {
+                    interpolationFactor = 1;
+                } else {
+                interpolationFactor = 1 - ((currentTime - sunriseTime) / (totalTime - sunriseTime));
+                }
+            }
+
             // Calculate boat's current position on the Bezier path
             if (m_animateBoat) {
                 m_curPosOnPath = std::fmod(m_curPosOnPath + m_speed * interval, 3.0f);
@@ -234,22 +250,6 @@ public:
             }
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
-            float interpolationFactor;
-            if (currentTime < nightTime) {
-                if (currentTime < sunsetTime) {
-                    interpolationFactor = 0;
-                }
-                else {
-                    interpolationFactor = (currentTime - sunsetTime) / (nightTime - sunsetTime);
-                }
-            }
-            else if (currentTime >= nightTime) {
-                if (currentTime < sunriseTime) {
-                    interpolationFactor = 1;
-                } else {
-                interpolationFactor = 1 - ((currentTime - sunriseTime) / (totalTime - sunriseTime));
-                }
-            }
             m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor);
 
             // Processes input and swaps the window buffer
@@ -315,12 +315,12 @@ private:
     double m_lastTime = 0.0;
     float m_speed = 0.3f; // unit: segments/second
     float m_curPosOnPath = 0.0f; // range: [0, 3), representing current position on the path
-
+    float interpolationFactor = 0.0f;
     float m_sunElevation = 0.0f;
     float m_sunAzimuth = 0.0f;
     float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
     // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
-    glm::vec3 m_lightColor;
+    glm::vec3 m_lightColor = glm::vec3(1.0f);
 
     // Shader for default rendering and for depth rendering
     Shader m_defaultShader;
@@ -396,10 +396,15 @@ private:
         m_environment->bindIrradianceMap(GL_TEXTURE1);
         m_environment->bindPrefilteredMap(GL_TEXTURE7);
         m_environment->bindBRDFMap(GL_TEXTURE8);
+        m_night.bindIrradianceMap(GL_TEXTURE9);
+        m_night.bindPrefilteredMap(GL_TEXTURE10);
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_defaultShader.getUniformLocation("prefilteredMap"), 7);
         glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
+        glUniform1i(m_defaultShader.getUniformLocation("irradianceMapNight"), 9);
+        glUniform1i(m_defaultShader.getUniformLocation("prefilteredMapNight"), 10);
         glUniform1i(m_defaultShader.getUniformLocation("useIBL"), m_useIBL);
+        glUniform1f(m_defaultShader.getUniformLocation("interpolationFactor"), interpolationFactor);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         if (m_dayNightSystem && m_useDirectionalLight) {
             if (currentTime <= sunsetTime) {
