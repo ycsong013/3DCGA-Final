@@ -24,7 +24,7 @@ public:
     void bindIrradianceMap(GLint irradianceMapSlot);
     void bindPrefilteredMap(GLint prefilteredMapSlot);
     void bindBRDFMap(GLint brdfMapSlot);
-    void drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix, Environment* nightEnvironment, float interpolationFactor);
+    void drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix, Environment* nightEnvironment, float interpolationFactor, bool dayNightSystem);
 
 private:
     static constexpr GLuint INVALID = 0xFFFFFFFF;

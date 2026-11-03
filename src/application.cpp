@@ -250,7 +250,7 @@ public:
             }
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
-            m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor);
+            m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor, m_dayNightSystem);
 
             // Processes input and swaps the window buffer
             m_window.swapBuffers();
@@ -404,6 +404,7 @@ private:
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMapNight"), 9);
         glUniform1i(m_defaultShader.getUniformLocation("prefilteredMapNight"), 10);
         glUniform1i(m_defaultShader.getUniformLocation("useIBL"), m_useIBL);
+        glUniform1i(m_defaultShader.getUniformLocation("dayNightSystem"), m_dayNightSystem);
         glUniform1f(m_defaultShader.getUniformLocation("interpolationFactor"), interpolationFactor);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         if (m_dayNightSystem && m_useDirectionalLight) {

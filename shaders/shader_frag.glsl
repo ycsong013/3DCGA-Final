@@ -25,6 +25,7 @@ uniform vec3 cameraPosition;
 uniform vec3 lightColor;
 uniform bool useIBL; // If we use IBL or not (environment mapping)
 uniform bool usePBR;
+uniform bool dayNightSystem;
 uniform vec3 sunDirection;
 uniform float sunIntensity;
 
@@ -156,18 +157,29 @@ void main()
             ambient = vec3(0.03) * albedo * ambientOcclusion; // LearnOpenGL advises to add an ambient term
         }
         else { // If IBL is used, use the lighting reflected from the environment as the ambient term instead.
-            vec3 irradianceDay = texture(irradianceMap, normal).xyz;
-            vec3 irradianceNight = texture(irradianceMapNight, normal).xyz;
-            vec3 irradiance = mix(irradianceDay, irradianceNight, interpolationFactor);
+            vec3 irradiance;
+            if (dayNightSystem) {
+                vec3 irradianceDay = texture(irradianceMap, normal).xyz;
+                vec3 irradianceNight = texture(irradianceMapNight, normal).xyz;
+                irradiance = mix(irradianceDay, irradianceNight, interpolationFactor);
+            } else {
+                irradiance = texture(irradianceMap, normal).xyz;
+            }
             vec3 IBLkS = fresnelWithRoughness(normal, fragToCamera, F0, roughness);
             vec3 IBLkD = vec3(1.0) - IBLkS;
 
             IBLkD *= (1.0 - metallic);
 
             vec3 reflectedLight = reflect(-fragToCamera, normal);
-            vec3 prefilterColorDay = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz; // 4 is used here because the prefiltered map contains 4 mipmap levels, ensuring that it doesn't go above 4
-            vec3 prefilterColorNight = textureLod(prefilteredMapNight, reflectedLight, roughness * 4).xyz;
-            vec3 prefilterColor = mix(prefilterColorDay, prefilterColorNight, interpolationFactor);
+            vec3 prefilterColor;
+            if (dayNightSystem) {
+                vec3 prefilterColorDay = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz; // 4 is used here because the prefiltered map contains 4 mipmap levels, ensuring that it doesn't go above 4
+                vec3 prefilterColorNight = textureLod(prefilteredMapNight, reflectedLight, roughness * 4).xyz;
+                prefilterColor = mix(prefilterColorDay, prefilterColorNight, interpolationFactor);
+            }
+            else {
+                prefilterColor = textureLod(prefilteredMap, reflectedLight, roughness * 4).xyz;
+            }
             vec2 brdfResult = texture(brdfMap, vec2(max(dot(normal, fragToCamera), 0.0), roughness)).xy;
 
             vec3 specularLight = prefilterColor * (IBLkS * brdfResult.x + brdfResult.y);

@@ -292,7 +292,7 @@ void Environment::createBRDFMap(GLuint frameBuffer, GLuint renderBuffer) {
 // The matrices here need to come from the MVP! There is no model matrix needed because the cube is all around the scene.
 // FOR THE DAY/NIGHT SYSTEM: Because I initially thought this function would be used by one environment only, I made this function take another environment
 // so that it blends the skybox map of the other environment with the current one. I'm going to assume that the "day" environment calls this in the application.
-void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix, Environment* nightEnvironment, float interpolationFactor) {
+void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix, Environment* nightEnvironment, float interpolationFactor, bool dayNightSystem) {
     m_skyboxShader.bind();
     glUniformMatrix4fv(m_skyboxShader.getUniformLocation("viewMatrix"), 1, GL_FALSE, glm::value_ptr(viewMatrix));
     glUniformMatrix4fv(m_skyboxShader.getUniformLocation("projectionMatrix"), 1, GL_FALSE, glm::value_ptr(projectionMatrix));
@@ -300,7 +300,11 @@ void Environment::drawSkyBox(glm::mat4 projectionMatrix, glm::mat4 viewMatrix, E
     nightEnvironment->bindCubeMap(GL_TEXTURE1);
     glUniform1i(m_skyboxShader.getUniformLocation("skyboxMapMorning"), 0);
     glUniform1i(m_skyboxShader.getUniformLocation("skyboxMapNight"), 1);
-    glUniform1f(m_skyboxShader.getUniformLocation("interpolationFactor"), interpolationFactor);
+    if (dayNightSystem) {
+        glUniform1f(m_skyboxShader.getUniformLocation("interpolationFactor"), interpolationFactor);
+    } else {
+        glUniform1f(m_skyboxShader.getUniformLocation("interpolationFactor"), 0); // Make it day time all the time if no day/night system.
+    }
     renderCube();
 }
 
