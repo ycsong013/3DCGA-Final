@@ -30,8 +30,9 @@ class Application {
 public:
     Application()
         : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
-        , m_environment(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
         , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
+        , m_day(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
+        , m_night(RESOURCE_ROOT "resources/hdris/NightSkyHDRI003_4K_HDR.hdr")
         , m_hullMesh(makeHull())
         , m_deckMesh(makeDeck())
         , m_sailMesh(makeSail())
@@ -233,7 +234,23 @@ public:
             }
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
-            m_environment.drawSkyBox(m_projectionMatrix, m_viewMatrix);
+            float interpolationFactor;
+            if (currentTime < nightTime) {
+                if (currentTime < sunsetTime) {
+                    interpolationFactor = 0;
+                }
+                else {
+                    interpolationFactor = (currentTime - sunsetTime) / (nightTime - sunsetTime);
+                }
+            }
+            else if (currentTime >= nightTime) {
+                if (currentTime < sunriseTime) {
+                    interpolationFactor = 1;
+                } else {
+                interpolationFactor = 1 - ((currentTime - sunriseTime) / (totalTime - sunriseTime));
+                }
+            }
+            m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor);
 
             // Processes input and swaps the window buffer
             m_window.swapBuffers();
@@ -311,7 +328,9 @@ private:
 
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;
-    Environment m_environment;
+    Environment m_day;
+    Environment* m_environment = &m_day;
+    Environment m_night;
     bool m_useMaterial { true };
 
     // Projection and view matrices for you to fill in and use
@@ -351,7 +370,8 @@ private:
     float currentTime = 0.0f;
     float sunsetTime = 10.0f;
     float nightTime = 20.0f;
-    float totalTime = 30.0f;
+    float sunriseTime = 30.0f;
+    float totalTime = 40.0f;
     bool m_dayNightSystem = false;
 
     void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
@@ -373,9 +393,9 @@ private:
         //Uncomment this line when you use the modelMatrix (or fragmentPosition)
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-        m_environment.bindIrradianceMap(GL_TEXTURE1);
-        m_environment.bindPrefilteredMap(GL_TEXTURE7);
-        m_environment.bindBRDFMap(GL_TEXTURE8);
+        m_environment->bindIrradianceMap(GL_TEXTURE1);
+        m_environment->bindPrefilteredMap(GL_TEXTURE7);
+        m_environment->bindBRDFMap(GL_TEXTURE8);
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_defaultShader.getUniformLocation("prefilteredMap"), 7);
         glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
