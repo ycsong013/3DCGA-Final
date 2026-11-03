@@ -30,8 +30,9 @@ class Application {
 public:
     Application()
         : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
-        , m_environment(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
         , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
+        , m_day(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
+        , m_night(RESOURCE_ROOT "resources/hdris/NightSkyHDRI003_4K_HDR.hdr")
         , m_hullMesh(makeHull())
         , m_deckMesh(makeDeck())
         , m_sailMesh(makeSail())
@@ -94,7 +95,7 @@ public:
             // Use ImGui for easy input/output of ints, floats, strings, etc...
             ImGui::Begin("Window");
             // ImGui::InputInt("This is an integer input", &dummyInteger); // Use ImGui::DragInt or ImGui::DragFloat for larger range of numbers.
-            // ImGui::Text("Value is: %i", dummyInteger); // Use C printf formatting rules (%i is a signed integer)
+            ImGui::Text("The current time is: %f", currentTime); // Use C printf formatting rules (%i is a signed integer)
             ImGui::Checkbox("Use material if no texture", &m_useMaterial);
             ImGui::Checkbox("Wireframe", &m_wireframe);
 
@@ -114,6 +115,24 @@ public:
             if (m_animateBoat) {
                 ImGui::SliderFloat("Speed", &m_speed, 0.0f, 30.0f);
             }
+
+            ImGui::Checkbox("Use Normal Maps Of the Textures", &m_useNormalMaps);
+            ImGui::Checkbox("Use Image Based Lighting", &m_useIBL);
+            ImGui::Checkbox("Use Physically Based Rendering", &m_usePBR);
+            ImGui::Checkbox("Use the Sun as a Directional Light", &m_useDirectionalLight);
+            
+            // In this mathematics forum, I saw that the sun's position is generally coded as an "azimuth" 
+            // and an "elevation". Thus, instead of letting the user set the XYZ coordinates of the sun's direction,
+            // it would be more in line for them to set the azimuth and the elevation and then
+            // calculate the XYZ later. This forum shows how to do it: https://math.stackexchange.com/questions/4697069/calculate-cartesian-angle-from-suns-azimuth-and-elevation
+
+            ImGui::SliderAngle("The Sun's Azimuth", &m_sunAzimuth, 0.0f, 360.0f);
+            ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
+            ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 10.0f);
+            ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
+
+            ImGui::Checkbox("Use a Day and Night System", &m_dayNightSystem);
+
 
             const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
             ImGui::Combo("Camera Mode", &m_cameraMode, cameraModes, IM_ARRAYSIZE(cameraModes));
@@ -140,6 +159,26 @@ public:
             double now = glfwGetTime(); 
             float interval = static_cast<float>(now - m_lastTime);
             m_lastTime = now;
+            currentTime += interval;
+            if (currentTime > totalTime) {
+                currentTime = 0.0;
+            }
+
+            if (currentTime < nightTime) {
+                if (currentTime < sunsetTime) {
+                    interpolationFactor = 0;
+                }
+                else {
+                    interpolationFactor = (currentTime - sunsetTime) / (nightTime - sunsetTime);
+                }
+            }
+            else if (currentTime >= nightTime) {
+                if (currentTime < sunriseTime) {
+                    interpolationFactor = 1;
+                } else {
+                interpolationFactor = 1 - ((currentTime - sunriseTime) / (totalTime - sunriseTime));
+                }
+            }
 
             // Calculate boat's current position on the Bezier path
             if (m_animateBoat) {
@@ -211,7 +250,7 @@ public:
             }
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
-            m_environment.drawSkyBox(m_projectionMatrix, m_viewMatrix);
+            m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor, m_dayNightSystem);
 
             // Processes input and swaps the window buffer
             m_window.swapBuffers();
@@ -262,6 +301,10 @@ private:
     // Tools for debugging
     bezierPath m_path;
     bool m_showPath = false;
+    bool m_useNormalMaps = false;
+    bool m_useIBL = false;
+    bool m_usePBR = false;
+    bool m_useDirectionalLight = false;
     bool m_wireframe = false;
     bool m_animateBoat = false;
     enum CameraMode { Aerial = 0, Top = 1, Third = 2 };
@@ -272,6 +315,12 @@ private:
     double m_lastTime = 0.0;
     float m_speed = 0.3f; // unit: segments/second
     float m_curPosOnPath = 0.0f; // range: [0, 3), representing current position on the path
+    float interpolationFactor = 0.0f;
+    float m_sunElevation = 0.0f;
+    float m_sunAzimuth = 0.0f;
+    float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
+    // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
+    glm::vec3 m_lightColor = glm::vec3(1.0f);
 
     // Shader for default rendering and for depth rendering
     Shader m_defaultShader;
@@ -279,7 +328,9 @@ private:
 
     std::vector<GPUMesh> m_meshes;
     Texture m_texture;
-    Environment m_environment;
+    Environment m_day;
+    Environment* m_environment = &m_day;
+    Environment m_night;
     bool m_useMaterial { true };
 
     // Projection and view matrices for you to fill in and use
@@ -287,6 +338,7 @@ private:
     glm::mat4 m_viewMatrix = glm::lookAt(glm::vec3(1, 1, 1), glm::vec3(0), glm::vec3(0, 1, 0));
     glm::mat4 m_modelMatrix { 1.0f };
     glm::vec3 cameraPosition;
+    glm::vec3 sunDirection;
 
     // Meshes for building the boat
     GPUMesh m_hullMesh;
@@ -309,6 +361,19 @@ private:
     PBRMaterial m_sailMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/coarse-loose-fabric-bl/coarse-loose-fabric_");
     PBRMaterial m_mastMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/bamboo-wood-semigloss-bl/bamboo-wood-semigloss-");
 
+    // Colors for the light of the sun for the "changing lighting conditions" feature
+    // We used the color codes given in this forum question: https://community.khronos.org/t/day-night-cycle-light/57752
+    glm::vec3 morningSun = glm::vec3(255.0, 255.0, 220.0) / 255.0f;
+    glm::vec3 eveningSun = glm::vec3(255.0, 60.0, 60.0) / 255.0f;
+    glm::vec3 nightSun = glm::vec3(20.0, 60.0, 180.0) / 255.0f;
+
+    float currentTime = 0.0f;
+    float sunsetTime = 10.0f;
+    float nightTime = 20.0f;
+    float sunriseTime = 30.0f;
+    float totalTime = 40.0f;
+    bool m_dayNightSystem = false;
+
     void drawMesh(GPUMesh& mesh, const glm::mat4& model, PBRMaterial* material = nullptr) {
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
@@ -316,29 +381,57 @@ private:
         // https://paroj.github.io/gltut/Illumination/Tut09%20Normal%20Transformation.html
         const glm::mat3 normalModelMatrix = glm::inverseTranspose(glm::mat3(model));
 
+        // I use the azimuth-elevation to cartesian conversion formula introduced in this 
+        // math forum: https://math.stackexchange.com/questions/4697069/calculate-cartesian-angle-from-suns-azimuth-and-elevation
+        // The answer in this forum is a bit different: OP's cartesian coordinate system puts z to be the "up" direction, whereas in OpenGL this is the "y" direction.
+        // So I swapped those two directions here.
+
+        sunDirection = glm::vec3(glm::cos(m_sunElevation) * glm::sin(m_sunAzimuth), glm::sin(m_sunElevation), glm::cos(m_sunElevation) * glm::cos(m_sunAzimuth));
+
         m_defaultShader.bind();
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("mvpMatrix"), 1, GL_FALSE, glm::value_ptr(mvpMatrix));
         //Uncomment this line when you use the modelMatrix (or fragmentPosition)
         glUniformMatrix4fv(m_defaultShader.getUniformLocation("modelMatrix"), 1, GL_FALSE, glm::value_ptr(model));
         glUniformMatrix3fv(m_defaultShader.getUniformLocation("normalModelMatrix"), 1, GL_FALSE, glm::value_ptr(normalModelMatrix));
-        m_environment.bindIrradianceMap(GL_TEXTURE1);
-        m_environment.bindPrefilteredMap(GL_TEXTURE7);
-        m_environment.bindBRDFMap(GL_TEXTURE8);
+        m_environment->bindIrradianceMap(GL_TEXTURE1);
+        m_environment->bindPrefilteredMap(GL_TEXTURE7);
+        m_environment->bindBRDFMap(GL_TEXTURE8);
+        m_night.bindIrradianceMap(GL_TEXTURE9);
+        m_night.bindPrefilteredMap(GL_TEXTURE10);
         glUniform1i(m_defaultShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_defaultShader.getUniformLocation("prefilteredMap"), 7);
         glUniform1i(m_defaultShader.getUniformLocation("brdfMap"), 8);
-        glUniform1i(m_defaultShader.getUniformLocation("useIBL"), 1);
+        glUniform1i(m_defaultShader.getUniformLocation("irradianceMapNight"), 9);
+        glUniform1i(m_defaultShader.getUniformLocation("prefilteredMapNight"), 10);
+        glUniform1i(m_defaultShader.getUniformLocation("useIBL"), m_useIBL);
+        glUniform1i(m_defaultShader.getUniformLocation("dayNightSystem"), m_dayNightSystem);
+        glUniform1f(m_defaultShader.getUniformLocation("interpolationFactor"), interpolationFactor);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
-        glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
+        if (m_dayNightSystem && m_useDirectionalLight) {
+            if (currentTime <= sunsetTime) {
+                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
+            }
+            else if (currentTime <= nightTime){
+                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(eveningSun, nightSun, (currentTime - sunsetTime) / (nightTime - sunsetTime))));
+            }
+            else {
+                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(nightSun));
+            }
+        } else {
+            glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
+        }
         glUniform3fv(m_defaultShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
+        glUniform3fv(m_defaultShader.getUniformLocation("sunDirection"), 1, glm::value_ptr(sunDirection));
+        glUniform1i(m_defaultShader.getUniformLocation("useNormalMap"), m_useNormalMaps);
+        glUniform1i(m_defaultShader.getUniformLocation("useDirectionalLight"), m_useDirectionalLight);
+        glUniform1f(m_defaultShader.getUniformLocation("sunIntensity"), m_sunIntensity);
         if (material != nullptr) {
             GLint textureSlots[] = {
                 GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6
             };
             material->bind(textureSlots);
             glUniform1i(m_defaultShader.getUniformLocation("hasTexCoords"), GL_TRUE);
-            // Is there an easier way of doing this??? Check.
-            glUniform1i(m_defaultShader.getUniformLocation("usePBR"), 1);
+            glUniform1i(m_defaultShader.getUniformLocation("usePBR"), m_usePBR);
             glUniform1i(m_defaultShader.getUniformLocation("useMaterial"), GL_FALSE);
             glUniform1i(m_defaultShader.getUniformLocation("textureAlbedo"), 2);
             glUniform1i(m_defaultShader.getUniformLocation("textureAO"), 3);
