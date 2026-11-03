@@ -79,9 +79,9 @@ GPUMesh::GPUMesh(const Mesh& cpuMesh)
         // in the end. We thought that this was a nice idea to incorporate for the tangent and bitangent calculations too
         // as the logic seems similar.
 
-        float angle1 = glm::acos(glm::dot(glm::normalize(edge1), glm::normalize(edge2))); // Using the simple math trick, the arc cosin of the dot product of the normalized vectors will give the angle.
-        float angle2 = glm::acos(glm::dot(glm::normalize(position1 - position2), glm::normalize(position3 - position2)));
-        float angle3 = glm::acos(glm::dot(glm::normalize(position1 - position3), glm::normalize(position2 - position3)));
+        float angle1 = glm::acos(glm::clamp(glm::dot(glm::normalize(edge1), glm::normalize(edge2)), -1.0f, 1.0f)); // Using the simple math trick, the arc cosin of the dot product of the normalized vectors will give the angle.
+        float angle2 = glm::acos(glm::clamp(glm::dot(glm::normalize(position1 - position2), glm::normalize(position3 - position2)), -1.0f, 1.0f));
+        float angle3 = glm::acos(glm::clamp(glm::dot(glm::normalize(position1 - position3), glm::normalize(position2 - position3)), -1.0f, 1.0f));
         tangents[triangle[0]] += angle1 * tangent;
         tangents[triangle[1]] += angle2 * tangent;
         tangents[triangle[2]] += angle3 * tangent;

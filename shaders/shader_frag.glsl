@@ -26,6 +26,7 @@ uniform vec3 lightColor;
 uniform bool useIBL; // If we use IBL or not (environment mapping)
 uniform bool usePBR;
 uniform bool dayNightSystem;
+uniform bool useShadows;
 uniform vec3 sunDirection;
 uniform float sunIntensity;
 
@@ -39,6 +40,8 @@ uniform sampler2D textureAO;
 uniform samplerCube prefilteredMap;
 uniform samplerCube prefilteredMapNight;
 uniform sampler2D brdfMap;
+uniform sampler2D shadowMap;
+uniform mat4 lightMVPMatrix;
 
 uniform float interpolationFactor;
 
@@ -97,7 +100,6 @@ void main()
 {
     float pi = radians(180.0); // Needed for the BRDF.
     vec3 normal = normalize(fragNormal);
-
 
     if (hasTexCoords)       { 
 
@@ -188,7 +190,37 @@ void main()
 
 
         }
-        vec3 color = ambient + outgoingRadiance;
+
+        float shadowFactor = 0.0f;
+        // Shadow calculation: (Similar implementation to my answer to assignment 4.)
+        if (useDirectionalLight && useShadows) {
+            vec4 fragLightCoord = lightMVPMatrix * vec4(fragPosition, 1.0);
+            // Divide by w because fragLightCoord are homogeneous coordinates
+            fragLightCoord.xyz /= fragLightCoord.w;
+            // The resulting value is in NDC space (-1 to +1),
+            //  we transform them to texture space (0 to 1).
+            fragLightCoord.xyz = fragLightCoord.xyz * 0.5 + 0.5;
+            // Depth of the fragment with respect to the light
+            float fragLightDepth = fragLightCoord.z;
+            // Shadow map coordinate corresponding to this fragment
+            vec2 shadowMapCoord = fragLightCoord.xy;
+            // Shadow map value from the corresponding shadow map position
+            float shadowMapDepth = texture(shadowMap, shadowMapCoord).x;
+
+            vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+            // Using the 3x3 nearest neighbor technique for shadows, again my implementation from assignment 4.
+            float shadow = 0.0f;
+            for (int x= -1; x <= 1; x++) {
+                for (int y= -1; y<= 1; y++){
+                    float neighborDepth = texture(shadowMap, shadowMapCoord + vec2(x,y) * texelSize).x;
+                    shadow += fragLightDepth - 0.01 > neighborDepth ? 1.0f : 0.0f;
+                }
+            }
+
+                shadowFactor = shadow / 9;
+        }
+
+        vec3 color = ambient + (1 - shadowFactor) * outgoingRadiance;
 
         // Finally, implement gamma correcting for more realistic colors to the eye:
 
