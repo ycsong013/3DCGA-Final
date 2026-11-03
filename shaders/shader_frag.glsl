@@ -206,9 +206,17 @@ void main()
             // Shadow map value from the corresponding shadow map position
             float shadowMapDepth = texture(shadowMap, shadowMapCoord).x;
 
-            if (shadowMapDepth + 0.01 < fragLightDepth) {
-                shadowFactor = 1.0f; // in shadow
-            } 
+            vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+            // Using the 3x3 nearest neighbor technique for shadows, again my implementation from assignment 4.
+            float shadow = 0.0f;
+            for (int x= -1; x <= 1; x++) {
+                for (int y= -1; y<= 1; y++){
+                    float neighborDepth = texture(shadowMap, shadowMapCoord + vec2(x,y) * texelSize).x;
+                    shadow += fragLightDepth - 0.01 > neighborDepth ? 1.0f : 0.0f;
+                }
+            }
+
+                shadowFactor = shadow / 9;
         }
 
         vec3 color = ambient + (1 - shadowFactor) * outgoingRadiance;
