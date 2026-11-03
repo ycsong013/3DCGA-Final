@@ -506,15 +506,7 @@ private:
         glUniform1f(m_defaultShader.getUniformLocation("interpolationFactor"), interpolationFactor);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         if (m_dayNightSystem && m_useDirectionalLight) {
-            if (currentTime <= sunsetTime) {
-                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
-            }
-            else if (currentTime <= nightTime){
-                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(eveningSun, nightSun, (currentTime - sunsetTime) / (nightTime - sunsetTime))));
-            }
-            else {
-                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(nightSun));
-            }
+            determineSunLight();
         } else {
             glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
         }
@@ -561,6 +553,18 @@ private:
         mesh.draw(m_shadowShader);
     }
 
+    void determineSunLight() {
+        if (currentTime <= sunsetTime) {
+                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
+            }
+            else if (currentTime <= nightTime){
+                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(eveningSun, nightSun, (currentTime - sunsetTime) / (nightTime - sunsetTime))));
+            }
+            else {
+                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(nightSun, morningSun, (currentTime - nightTime) / (totalTime - nightTime))));
+         }
+    }
+
     void drawSea(GPUMesh& mesh, const glm::mat4& model) {
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
@@ -599,16 +603,8 @@ private:
         glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
         glUniform3fv(m_seaShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
         glUniform1f(m_seaShader.getUniformLocation("interpolationFactor"), m_dayNightSystem ? interpolationFactor : 0.0f);
-                if (m_dayNightSystem && m_useDirectionalLight) {
-            if (currentTime <= sunsetTime) {
-                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
-            }
-            else if (currentTime <= nightTime){
-                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(eveningSun, nightSun, (currentTime - sunsetTime) / (nightTime - sunsetTime))));
-            }
-            else {
-                glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(nightSun));
-            }
+        if (m_dayNightSystem && m_useDirectionalLight) {
+            determineSunLight();
         } else {
             glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
         }
