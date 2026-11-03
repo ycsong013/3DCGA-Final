@@ -71,7 +71,7 @@ public:
 
             ShaderBuilder shadowBuilder;
             shadowBuilder.addStage(GL_VERTEX_SHADER, RESOURCE_ROOT "shaders/shadow_vert.glsl");
-            shadowBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "Shaders/shadow_frag.glsl");
+            shadowBuilder.addStage(GL_FRAGMENT_SHADER, RESOURCE_ROOT "shaders/shadow_frag.glsl");
             m_shadowShader = shadowBuilder.build();
 
             ShaderBuilder seaBuilder;
@@ -511,9 +511,9 @@ private:
         glUniform1f(m_seaShader.getUniformLocation("amp3"), m_amp3);
         glUniform1f(m_seaShader.getUniformLocation("wav3"), m_wav3);
         glUniform1f(m_seaShader.getUniformLocation("spe3"), m_spe3);
-        m_environment.bindIrradianceMap(GL_TEXTURE1);
-        m_environment.bindPrefilteredMap(GL_TEXTURE7);
-        m_environment.bindBRDFMap(GL_TEXTURE8);
+        m_environment->bindIrradianceMap(GL_TEXTURE1);
+        m_environment->bindPrefilteredMap(GL_TEXTURE7);
+        m_environment->bindBRDFMap(GL_TEXTURE8);
         glUniform1i(m_seaShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_seaShader.getUniformLocation("prefilteredMap"), 7);
         glUniform1i(m_seaShader.getUniformLocation("brdfMap"), 8);
