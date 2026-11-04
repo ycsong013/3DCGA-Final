@@ -15,6 +15,7 @@ uniform float sunIntensity;
 uniform mat4 lightMVPMatrix;
 uniform bool useShadows;
 uniform bool dayNightSystem;
+uniform float shininess;
 
 out vec4 fragColor;
 
@@ -70,8 +71,8 @@ void main() {
 	if (useDirectionalLight) {
 		// Simple Lambert and Blinn Phong shading, as detailed in assignment 3. This is from my implementation of assignment 3.
 		vec3 diffuseColor = waterBase * lightColor * sunIntensity * max(dot(N, normalize(sunDirection)), 0.0);
-		vec3 halfwayVector = normalize(V + sunDirection);
-		vec3 specularColor = lightColor * sunIntensity * pow(max(dot(N, halfwayVector), 0.0), 64); // Shininess: defined as 64 here for now
+		vec3 halfwayVector = normalize(V + normalize(sunDirection));
+		vec3 specularColor = lightColor * sunIntensity * pow(max(dot(N, halfwayVector), 0.0), shininess);
 		sunColor = (1 - shadowFactor) * (diffuseColor + specularColor);
 	}
 
