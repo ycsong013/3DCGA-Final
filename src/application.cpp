@@ -129,6 +129,7 @@ public:
 
             ImGui::Separator();
             ImGui::Checkbox("Minimap", &m_showMinimap);
+            ImGui::Checkbox("Environment Map", &m_showEnvironmentMap);
             
             ImGui::Spacing();
             ImGui::Text("Boat Animation");
@@ -362,7 +363,9 @@ public:
             renderScene(m_showPath);
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
-            m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor, m_dayNightSystem);
+            if (m_showEnvironmentMap) {
+                m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor, m_dayNightSystem);
+            }
 
             if (m_showMinimap) {
                 drawMinimap();
@@ -432,6 +435,7 @@ private:
     bool m_useDirectionalLight = false;
     bool m_wireframe = false;
     bool m_showMinimap = false;
+    bool m_showEnvironmentMap = false;
 
     // Tools for the camera
     enum CameraMode { Aerial = 0, Top = 1, Third = 2 };
