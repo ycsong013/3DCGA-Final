@@ -9,6 +9,8 @@ uniform mat3 normalModelMatrix;
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
 layout(location = 2) in vec2 texCoord;
+
+// Newly defined tangent and bitangent vectors (used for normal mapping)
 layout(location = 3) in vec3 tangent;
 layout(location = 4) in vec3 bitangent;
 
@@ -25,8 +27,7 @@ void main()
     fragNormal      = normalModelMatrix * normal;
     fragTexCoord    = texCoord;
 
-    // I'm not sure if we should use the model matrix or the normal model matrix here, and I couldn't find much on the internet.
-    // So I'm using this instead.
+    // Use the normal model matrix like application.cpp to put the bitangent and tangent vectors in the same space.
     vec3 fragT = normalModelMatrix * tangent;
     vec3 fragB = normalModelMatrix * bitangent;
 
