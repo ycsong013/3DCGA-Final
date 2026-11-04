@@ -31,8 +31,8 @@ public:
     Application()
         : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
         , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
-        , m_day(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
-        , m_night(RESOURCE_ROOT "resources/hdris/NightSkyHDRI003_4K_HDR.hdr")
+        , m_day(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr") // Day skymap
+        , m_night(RESOURCE_ROOT "resources/hdris/NightSkyHDRI003_4K_HDR.hdr") // Night skymap
         , m_seaMesh(makeGrid(100, 200))
         , m_hullMesh(makeHull())
         , m_deckMesh(makeDeck())
@@ -125,8 +125,15 @@ public:
             ImGui::Text("The current time is: %f", currentTime); // Use C printf formatting rules (%i is a signed integer)
             ImGui::Checkbox("Use material if no texture", &m_useMaterial);
             ImGui::Checkbox("Wireframe", &m_wireframe);
-            ImGui::Checkbox("Minimap", &m_showMinimap);
+            ImGui::Spacing();
 
+            ImGui::Separator();
+            ImGui::Checkbox("Minimap", &m_showMinimap);
+            ImGui::Checkbox("Environment Map", &m_showEnvironmentMap);
+            
+            ImGui::Spacing();
+            ImGui::Text("Boat Animation");
+            ImGui::Separator();
             ImGui::Checkbox("Animate Boom", &m_animateBoom);
             if (m_animateBoom) {
                 ImGui::SliderFloat("Boom speed (degrees / sec)", &m_boomSpeed, 0.0f, 60.0f);
@@ -149,38 +156,68 @@ public:
                     ImGui::SliderFloat("Speed", &m_bezierSpeed, 0.0f, 1.0f);
                 }
             }
+
+            ImGui::Spacing();
+            ImGui::Separator();
             
+            ImGui::Checkbox("Use Physically Based Rendering", &m_usePBR);
+            ImGui::Separator();
+
+            if (!m_usePBR) {
+            ImGui::Spacing();
+            ImGui::Text("Uniforms if PBR shading is not used");
+            ImGui::Separator();
             ImGui::ColorEdit3("kd", glm::value_ptr(m_userDefinedkd));
             ImGui::ColorEdit3("ks", glm::value_ptr(m_userDefinedks));
             ImGui::SliderFloat("shininess", &m_userDefinedShininess, 0.0f, 256.0f);
+            }
 
+            ImGui::Spacing();
+            ImGui::Separator();
             ImGui::Checkbox("Use Textures", &m_useTextures);
-            ImGui::ColorEdit3("Albedo", glm::value_ptr(m_userDefinedAlbedo));
-            ImGui::SliderFloat("Roughness", &m_userDefinedRoughness, 0.0f, 1.0f);
-            ImGui::SliderFloat("Ambient Occlusion", &m_userDefinedAO, 0.0f, 1.0f);
-            ImGui::SliderFloat("Metallicity", &m_userDefinedMetallic, 0.0f, 1.0f);
+            ImGui::Separator();
 
+            if (!m_useTextures) {
+                ImGui::Spacing();
+                ImGui::Text("Uniforms if textures are not used");
+                ImGui::Separator();
+                ImGui::ColorEdit3("Albedo", glm::value_ptr(m_userDefinedAlbedo));
+                ImGui::SliderFloat("Roughness", &m_userDefinedRoughness, 0.0f, 1.0f);
+                ImGui::SliderFloat("Ambient Occlusion", &m_userDefinedAO, 0.0f, 1.0f);
+                ImGui::SliderFloat("Metallicity", &m_userDefinedMetallic, 0.0f, 1.0f);
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
 
             ImGui::Checkbox("Use Normal Maps Of the Textures", &m_useNormalMaps);
             ImGui::Checkbox("Use Image Based Lighting", &m_useIBL);
-            ImGui::Checkbox("Use Physically Based Rendering", &m_usePBR);
-            ImGui::Checkbox("Use the Sun as a Directional Light", &m_useDirectionalLight);
-            ImGui::Checkbox("Cast Shadows from the Sun", &m_useShadows);
-            
-            // In this mathematics forum, I saw that the sun's position is generally coded as an "azimuth" 
-            // and an "elevation". Thus, instead of letting the user set the XYZ coordinates of the sun's direction,
-            // it would be more in line for them to set the azimuth and the elevation and then
-            // calculate the XYZ later. This forum shows how to do it: https://math.stackexchange.com/questions/4697069/calculate-cartesian-angle-from-suns-azimuth-and-elevation
 
-            ImGui::SliderAngle("The Sun's Azimuth", &m_sunAzimuth, 0.0f, 360.0f);
-            ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
-            ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 5.0f);
-            ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
-            ImGui::SliderFloat("The shininess of the sea",&m_seaShininess, 0.0f, 256.0f);
+            ImGui::Spacing();
+            ImGui::Text("Uniforms for the Sun");
+            ImGui::Separator();
+            ImGui::Checkbox("Use the Sun as a Directional Light", &m_useDirectionalLight);
+            if (m_useDirectionalLight) {
+                ImGui::Checkbox("Cast Shadows from the Sun", &m_useShadows);
+                
+                // In this mathematics forum, I saw that the sun's position is generally coded as an "azimuth" 
+                // and an "elevation". Thus, instead of letting the user set the XYZ coordinates of the sun's direction,
+                // it would be more in line for them to set the azimuth and the elevation and then
+                // calculate the XYZ later. This forum shows how to do it: https://math.stackexchange.com/questions/4697069/calculate-cartesian-angle-from-suns-azimuth-and-elevation
+
+                ImGui::SliderAngle("The Sun's Azimuth", &m_sunAzimuth, 0.0f, 360.0f);
+                ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
+                ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 5.0f);
+                ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
+                ImGui::SliderFloat("The shininess of the sea",&m_seaShininess, 0.0f, 256.0f);
+            }
 
             ImGui::Checkbox("Use a Day and Night System", &m_dayNightSystem);
 
 
+            ImGui::Spacing();
+            ImGui::Text("Camera Controls");
+            ImGui::Separator();
             const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
             ImGui::Combo("Camera Mode", &m_cameraMode, cameraModes, IM_ARRAYSIZE(cameraModes));
             if (m_cameraMode == Aerial) {
@@ -188,6 +225,10 @@ public:
                 ImGui::SliderFloat("Aerial view Y", &m_aerialY, 0.0f, 5.0f);
                 ImGui::SliderFloat("Aerial view Z", &m_aerialZ, 0.0f, 10.0f);
             }
+
+            ImGui::Spacing();
+            ImGui::Text("Water Controls");
+            ImGui::Separator();
 
             // k = 2 * pi / wavelength, so wavelength cannot be 0
             ImGui::SliderFloat("Amplitude of wave +x+z", &m_amp1, 0.0f, 0.1f);
@@ -224,6 +265,7 @@ public:
                 currentTime = 0.0;
             }
 
+            // Calculate the interpolation factor for the day/night system.
             if (currentTime < nightTime) {
                 if (currentTime < sunsetTime) {
                     interpolationFactor = 0;
@@ -321,7 +363,9 @@ public:
             renderScene(m_showPath);
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);   // Reset wireframe to off after all draws
-            m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor, m_dayNightSystem);
+            if (m_showEnvironmentMap) {
+                m_environment->drawSkyBox(m_projectionMatrix, m_viewMatrix, &m_night, interpolationFactor, m_dayNightSystem);
+            }
 
             if (m_showMinimap) {
                 drawMinimap();
@@ -391,6 +435,7 @@ private:
     bool m_useDirectionalLight = false;
     bool m_wireframe = false;
     bool m_showMinimap = false;
+    bool m_showEnvironmentMap = false;
 
     // Tools for the camera
     enum CameraMode { Aerial = 0, Top = 1, Third = 2 };
@@ -429,9 +474,8 @@ private:
     glm::mat4 m_lightProjectionMatrix = glm::perspective(glm::radians(80.0f), 1.0f, 0.1f, 30.0f); // LearnOpenGL mentions that the projection matrix
     // for directional light sources must be different.
     glm::mat4 m_modelMatrix { 1.0f };
-    glm::mat4 m_lightMVPMatrix;
+    glm::mat4 m_lightMVPMatrix; // MVP matrix for shadow mapping
     glm::vec3 cameraPosition;
-    glm::vec3 sunDirection;
 
     // Meshes for the project
     GPUMesh m_seaMesh;
@@ -450,6 +494,7 @@ private:
     float m_pitchSpeed = 30.0f;
     float m_pitchTime = 0.0f;
 
+    // Material used to render the boat.
     PBRMaterial m_hullMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/white-gold-bl/white-gold_");
     PBRMaterial m_deckMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/hungarian-point-flooring-bl/hungarian-point-flooring_");
     PBRMaterial m_sailMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/coarse-loose-fabric-bl/coarse-loose-fabric_");
@@ -462,12 +507,16 @@ private:
     // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
     glm::vec3 m_lightColor = glm::vec3(1.0f);
     float m_sunDistance = 15.0f;
+    glm::vec3 sunDirection;
     bool m_useShadows = false; // Set shadows to false at first.
     float m_seaShininess = 64.0f;
+
+    // Tools for No-PBR shading:
     glm::vec3 m_userDefinedkd = glm::vec3(0.0f);
     glm::vec3 m_userDefinedks = glm::vec3(0.0f);
     float m_userDefinedShininess = 1.0f;
 
+    // Tools for shading without textures
     glm::vec3 m_userDefinedAlbedo = glm::vec3(0.0f);
     float m_userDefinedRoughness = 0.5f;
     float m_userDefinedMetallic = 0.5f;
@@ -481,6 +530,7 @@ private:
     glm::vec3 eveningSun = glm::vec3(255.0, 60.0, 60.0) / 255.0f;
     glm::vec3 nightSun = glm::vec3(20.0, 60.0, 180.0) / 255.0f;
 
+    // Variables for the day/night system.
     float currentTime = 0.0f;
     float sunsetTime = 10.0f;
     float nightTime = 20.0f;
@@ -580,6 +630,7 @@ private:
         mesh.draw(m_defaultShader);
     }
 
+    // Draw mesh for shadow mapping.
     void drawMeshShadow(GPUMesh& mesh, const glm::mat4& model) {
         glm::mat4 lightMVPMatrix = m_lightProjectionMatrix * m_lightViewMatrix * model;
 
@@ -590,6 +641,7 @@ private:
         mesh.draw(m_shadowShader);
     }
 
+    // Function to determine the current sunlight if we use the day/night system. We use linear interpolation here.
     void determineSunLight(Shader& shader) {
         if (currentTime <= sunsetTime) {
                 glUniform3fv(shader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
@@ -667,6 +719,7 @@ private:
         }
     }
 
+    // Draw node function for the boat for shadow mapping
     void drawNodeShadow(const Node& node, const glm::mat4& parentWorld) {
         glm::mat4 world = parentWorld * node.transform;
 

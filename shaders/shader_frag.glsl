@@ -13,25 +13,40 @@ layout(std140) uniform Material // Must match the GPUMaterial defined in src/mes
 	float transparency;
 };
 
+// IBL Uniforms
 uniform sampler2D colorMap;
 uniform samplerCube irradianceMap;
 uniform samplerCube irradianceMapNight;
+uniform samplerCube prefilteredMap;
+uniform samplerCube prefilteredMapNight;
+uniform sampler2D brdfMap;
+uniform bool useIBL; // If we use IBL or not (environment mapping)
+
 uniform bool hasTexCoords;
 uniform bool useMaterial;
+
 uniform bool useNormalMap; // If we use the normal mapping or not (minimal feature)
+
+// Uniforms regarding the sun:
+
 uniform bool useDirectionalLight; // If we use the "sun" or not.
-uniform vec3 lightPosition;
-uniform vec3 cameraPosition;
-uniform vec3 lightColor;
-uniform bool useIBL; // If we use IBL or not (environment mapping)
-uniform bool usePBR;
 uniform bool dayNightSystem;
+uniform float interpolationFactor; // Interpolation factor for the day-night system.
 uniform bool useShadows;
 uniform vec3 sunDirection;
 uniform float sunIntensity;
+uniform vec3 lightColor; // The color of the sun if directional light is used, or a simple white light.
+
+uniform vec3 lightPosition;
+uniform vec3 cameraPosition;
+
+// PBR, if not used, the user can define uniforms for the non-PBR shading.
+uniform bool usePBR;
 uniform vec3 userDefinedks;
 uniform vec3 userDefinedkd;
 uniform float userDefinedShininess;
+
+// Uniforms set by the user if no textures will be used.
 uniform vec3 userDefinedAlbedo;
 uniform float userDefinedRoughness;
 uniform float userDefinedMetallic;
@@ -45,13 +60,10 @@ uniform sampler2D textureMetallic;
 uniform sampler2D textureRoughness;
 uniform sampler2D textureAO;
 
-uniform samplerCube prefilteredMap;
-uniform samplerCube prefilteredMapNight;
-uniform sampler2D brdfMap;
+// Shadow-based uniforms
 uniform sampler2D shadowMap;
 uniform mat4 lightMVPMatrix;
 
-uniform float interpolationFactor;
 
 in vec3 fragPosition;
 in vec3 fragNormal;
@@ -117,7 +129,7 @@ void main()
                 vec3 diffuseColor = userDefinedkd * lightColor * sunIntensity * max(dot(normal, normalize(sunDirection)), 0.0);
                 vec3 halfwayVector = normalize(normalize(cameraPosition - fragPosition) + normalize(sunDirection));
                 vec3 specularColor = userDefinedks * lightColor * sunIntensity * pow(max(dot(normal, halfwayVector), 0.0), userDefinedShininess);
-                fragColor = vec4(diffuseColor + specularColor, 1.0);
+                fragColor = vec4(0.15 * userDefinedkd + diffuseColor + specularColor, 1.0);
             }
         }
         else {
