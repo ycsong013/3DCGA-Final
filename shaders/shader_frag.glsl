@@ -35,14 +35,18 @@ uniform float interpolationFactor; // Interpolation factor for the day-night sys
 uniform bool useShadows;
 uniform vec3 sunDirection;
 uniform float sunIntensity;
+uniform vec3 lightColor; // The color of the sun if directional light is used, or a simple white light.
 
 uniform vec3 lightPosition;
 uniform vec3 cameraPosition;
-uniform vec3 lightColor;
+
+// PBR, if not used, the user can define uniforms for the non-PBR shading.
 uniform bool usePBR;
 uniform vec3 userDefinedks;
 uniform vec3 userDefinedkd;
 uniform float userDefinedShininess;
+
+// Uniforms set by the user if no textures will be used.
 uniform vec3 userDefinedAlbedo;
 uniform float userDefinedRoughness;
 uniform float userDefinedMetallic;
