@@ -13,22 +13,33 @@ layout(std140) uniform Material // Must match the GPUMaterial defined in src/mes
 	float transparency;
 };
 
+// IBL Uniforms
 uniform sampler2D colorMap;
 uniform samplerCube irradianceMap;
 uniform samplerCube irradianceMapNight;
+uniform samplerCube prefilteredMap;
+uniform samplerCube prefilteredMapNight;
+uniform sampler2D brdfMap;
+uniform bool useIBL; // If we use IBL or not (environment mapping)
+
 uniform bool hasTexCoords;
 uniform bool useMaterial;
+
 uniform bool useNormalMap; // If we use the normal mapping or not (minimal feature)
+
+// Uniforms regarding the sun:
+
 uniform bool useDirectionalLight; // If we use the "sun" or not.
-uniform vec3 lightPosition;
-uniform vec3 cameraPosition;
-uniform vec3 lightColor;
-uniform bool useIBL; // If we use IBL or not (environment mapping)
-uniform bool usePBR;
 uniform bool dayNightSystem;
+uniform float interpolationFactor; // Interpolation factor for the day-night system.
 uniform bool useShadows;
 uniform vec3 sunDirection;
 uniform float sunIntensity;
+
+uniform vec3 lightPosition;
+uniform vec3 cameraPosition;
+uniform vec3 lightColor;
+uniform bool usePBR;
 uniform vec3 userDefinedks;
 uniform vec3 userDefinedkd;
 uniform float userDefinedShininess;
@@ -45,13 +56,10 @@ uniform sampler2D textureMetallic;
 uniform sampler2D textureRoughness;
 uniform sampler2D textureAO;
 
-uniform samplerCube prefilteredMap;
-uniform samplerCube prefilteredMapNight;
-uniform sampler2D brdfMap;
+// Shadow-based uniforms
 uniform sampler2D shadowMap;
 uniform mat4 lightMVPMatrix;
 
-uniform float interpolationFactor;
 
 in vec3 fragPosition;
 in vec3 fragNormal;
