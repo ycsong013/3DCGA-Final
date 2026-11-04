@@ -31,8 +31,8 @@ public:
     Application()
         : m_window("Final Project", glm::ivec2(1024, 1024), OpenGLVersion::GL41)
         , m_texture(RESOURCE_ROOT "resources/checkerboard.png")
-        , m_day(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr")
-        , m_night(RESOURCE_ROOT "resources/hdris/NightSkyHDRI003_4K_HDR.hdr")
+        , m_day(RESOURCE_ROOT "resources/hdris/citrus_orchard_puresky_4k.hdr") // Day skymap
+        , m_night(RESOURCE_ROOT "resources/hdris/NightSkyHDRI003_4K_HDR.hdr") // Night skymap
         , m_seaMesh(makeGrid(100, 200))
         , m_hullMesh(makeHull())
         , m_deckMesh(makeDeck())
@@ -224,6 +224,7 @@ public:
                 currentTime = 0.0;
             }
 
+            // Calculate the interpolation factor for the day/night system.
             if (currentTime < nightTime) {
                 if (currentTime < sunsetTime) {
                     interpolationFactor = 0;
@@ -429,9 +430,8 @@ private:
     glm::mat4 m_lightProjectionMatrix = glm::perspective(glm::radians(80.0f), 1.0f, 0.1f, 30.0f); // LearnOpenGL mentions that the projection matrix
     // for directional light sources must be different.
     glm::mat4 m_modelMatrix { 1.0f };
-    glm::mat4 m_lightMVPMatrix;
+    glm::mat4 m_lightMVPMatrix; // MVP matrix for shadow mapping
     glm::vec3 cameraPosition;
-    glm::vec3 sunDirection;
 
     // Meshes for the project
     GPUMesh m_seaMesh;
@@ -450,6 +450,7 @@ private:
     float m_pitchSpeed = 30.0f;
     float m_pitchTime = 0.0f;
 
+    // Material used to render the boat.
     PBRMaterial m_hullMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/white-gold-bl/white-gold_");
     PBRMaterial m_deckMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/hungarian-point-flooring-bl/hungarian-point-flooring_");
     PBRMaterial m_sailMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/coarse-loose-fabric-bl/coarse-loose-fabric_");
@@ -462,12 +463,16 @@ private:
     // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
     glm::vec3 m_lightColor = glm::vec3(1.0f);
     float m_sunDistance = 15.0f;
+    glm::vec3 sunDirection;
     bool m_useShadows = false; // Set shadows to false at first.
     float m_seaShininess = 64.0f;
+
+    // Tools for No-PBR shading:
     glm::vec3 m_userDefinedkd = glm::vec3(0.0f);
     glm::vec3 m_userDefinedks = glm::vec3(0.0f);
     float m_userDefinedShininess = 1.0f;
 
+    // Tools for shading without textures
     glm::vec3 m_userDefinedAlbedo = glm::vec3(0.0f);
     float m_userDefinedRoughness = 0.5f;
     float m_userDefinedMetallic = 0.5f;
@@ -481,6 +486,7 @@ private:
     glm::vec3 eveningSun = glm::vec3(255.0, 60.0, 60.0) / 255.0f;
     glm::vec3 nightSun = glm::vec3(20.0, 60.0, 180.0) / 255.0f;
 
+    // Variables for the day/night system.
     float currentTime = 0.0f;
     float sunsetTime = 10.0f;
     float nightTime = 20.0f;
@@ -580,6 +586,7 @@ private:
         mesh.draw(m_defaultShader);
     }
 
+    // Draw mesh for shadow mapping.
     void drawMeshShadow(GPUMesh& mesh, const glm::mat4& model) {
         glm::mat4 lightMVPMatrix = m_lightProjectionMatrix * m_lightViewMatrix * model;
 
@@ -590,6 +597,7 @@ private:
         mesh.draw(m_shadowShader);
     }
 
+    // Function to determine the current sunlight if we use the day/night system. We use linear interpolation here.
     void determineSunLight(Shader& shader) {
         if (currentTime <= sunsetTime) {
                 glUniform3fv(shader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
@@ -667,6 +675,7 @@ private:
         }
     }
 
+    // Draw node function for the boat for shadow mapping
     void drawNodeShadow(const Node& node, const glm::mat4& parentWorld) {
         glm::mat4 world = parentWorld * node.transform;
 
