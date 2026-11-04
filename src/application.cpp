@@ -58,9 +58,11 @@ public:
         m_boat = buildBoat(m_boatRoot, m_hullMesh, m_deckMesh, m_boxMesh, m_sailMesh,
             m_hullMaterial, m_deckMaterial, m_mastMaterial, m_sailMaterial);
 
-        m_path.build(glm::vec3(-5.0f, 0.0f, -5.0f),   // start of the linear bezier
+        m_path.build(glm::vec3(0.0f, 0.0f, -5.0f),   // start of the linear bezier
                      glm::vec3(5.0f, 0.0f, -5.0f),    // end of the linear bezier / start of the quadratic bezier
                      glm::vec3(0.0f, 0.0f, 5.0f));    // end of the quadratic bezier
+        m_path.buildArcLengthTable(500); 
+
         m_lastTime = glfwGetTime();
 
         try {
@@ -136,10 +138,16 @@ public:
             }
 
             ImGui::Checkbox("Show Bezier Path", &m_showPath);
-
+            
             ImGui::Checkbox("Animate Boat", &m_animateBoat);
             if (m_animateBoat) {
-                ImGui::SliderFloat("Speed", &m_speed, 0.0f, 1.0f);
+                ImGui::Checkbox("Travel at constant speed", &m_travelAtConstantSpeed);
+
+                if (m_travelAtConstantSpeed) {
+                    ImGui::SliderFloat("Constant Speed", &m_constantSpeed, 0.0f, 10.0f);
+                } else {
+                    ImGui::SliderFloat("Speed", &m_bezierSpeed, 0.0f, 1.0f);
+                }
             }
 
             ImGui::Checkbox("Use Normal Maps Of the Textures", &m_useNormalMaps);
@@ -198,6 +206,8 @@ public:
             double now = glfwGetTime(); 
             float interval = static_cast<float>(now - m_lastTime);
             m_lastTime = now;
+
+            // Calculate time for the day&night system
             currentTime += interval;
             if (currentTime > totalTime) {
                 currentTime = 0.0;
@@ -218,9 +228,17 @@ public:
                 interpolationFactor = 1 - ((currentTime - sunriseTime) / (totalTime - sunriseTime));
                 }
             }
-            // Calculate boat's current position on the Bezier path
+
+            // Calculate boat's current position on the Bezier path and its real-world distance
+            // We update both values so that the boat won't teleport when user switch traveling modes
             if (m_animateBoat) {
-                m_curPosOnPath = std::fmod(m_curPosOnPath + m_speed * interval, 3.0f);
+                if (m_travelAtConstantSpeed) {
+                    m_curDistance = std::fmod(m_curDistance + m_constantSpeed * interval, m_path.totalDistance);
+                    m_curPosOnPath = m_path.distanceToPosOnPath(m_curDistance);
+                } else {
+                    m_curPosOnPath = std::fmod(m_curPosOnPath + m_bezierSpeed * interval, 3.0f);
+                    m_curDistance = m_path.posOnPathToDistance(m_curPosOnPath);
+                }
             }
 
             // Calculate boat's current position in the real world
@@ -373,10 +391,13 @@ private:
     // Tools for the Bezier path
     bezierPath m_path;
     bool m_showPath = false;
+    bool m_travelAtConstantSpeed = false;
     bool m_animateBoat = false;
     double m_lastTime = 0.0;
-    float m_speed = 0.3f; // unit: segments/second
+    float m_bezierSpeed = 0.3f; // unit: segments per second
+    float m_constantSpeed = 2.0f;// real-world speed
     float m_curPosOnPath = 0.0f; // range: [0, 3), representing current position on the path
+    float m_curDistance = 0.0f; // real-world distance
 
     // Shader for default rendering and for depth rendering
     Shader m_defaultShader;

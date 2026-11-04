@@ -82,4 +82,52 @@ struct bezierPath {
 			break;
 		}
 	}
+
+	std::vector<glm::vec2> arcLengthTable;
+	float totalDistance = 0.0f;
+
+	void buildArcLengthTable(int samples) {
+		// We aim to build a table to map 
+		// from the position on the path, i.e. L1
+		// to the real-world distance from the starting point L0, i.e. real distance from L0 to L1
+		// i.e. glm::vec2(0, 0), glm::vec2(0.1, 3), ..., glm::vec2(2.9, 13), glm::vec2(3.0, 14)
+
+		glm::vec3 prevPos = L0;
+		for (int i = 0; i < samples; i++) {
+			glm::vec3 pos, dir;
+			float posOnPath = 3.0f * i / samples;
+			calcPosAndDir(posOnPath, pos, dir);
+			totalDistance += glm::length(pos - prevPos);
+			arcLengthTable.push_back(glm::vec2(posOnPath, totalDistance));
+			prevPos = pos;
+		}
+
+		// Add the last arc to the table
+		totalDistance += glm::length(L0 - prevPos);
+		arcLengthTable.push_back(glm::vec2(3.0f, totalDistance));
+	}
+
+	float distanceToPosOnPath(float distance) {
+		// Given a real world distance [0, totalDistance), we map it to the position on the path [0, 3)
+
+		auto upper = std::upper_bound(arcLengthTable.begin(), arcLengthTable.end(), distance, 
+			[](float d, const glm::vec2& entry) { return d < entry.y; });
+		auto lower = upper - 1;
+
+		float posOnPath = lower->x + (distance - lower->y) / (upper->y - lower->y) * (upper->x - lower->x);
+
+		return posOnPath;
+	}
+
+	float posOnPathToDistance(float posOnPath) {
+		// Given a position on the path [0, 3), we map it to the real world distance [0, totalDistance)
+
+		auto upper = std::upper_bound(arcLengthTable.begin(), arcLengthTable.end(), posOnPath,
+			[](float d, const glm::vec2& entry) { return d < entry.x; });
+		auto lower = upper - 1;
+
+		float distance = lower->y + (posOnPath - lower->x) / (upper->x - lower->x) * (upper->y - lower->y);
+
+		return distance;
+	}
 };
