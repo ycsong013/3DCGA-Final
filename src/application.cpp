@@ -141,6 +141,17 @@ public:
             if (m_animateBoat) {
                 ImGui::SliderFloat("Speed", &m_speed, 0.0f, 1.0f);
             }
+            
+            ImGui::ColorEdit3("kd", glm::value_ptr(m_userDefinedkd));
+            ImGui::ColorEdit3("ks", glm::value_ptr(m_userDefinedks));
+            ImGui::SliderFloat("shininess", &m_userDefinedShininess, 0.0f, 256.0f);
+
+            ImGui::Checkbox("Use Textures", &m_useTextures);
+            ImGui::ColorEdit3("Albedo", glm::value_ptr(m_userDefinedAlbedo));
+            ImGui::SliderFloat("Roughness", &m_userDefinedRoughness, 0.0f, 1.0f);
+            ImGui::SliderFloat("Ambient Occlusion", &m_userDefinedAO, 0.0f, 1.0f);
+            ImGui::SliderFloat("Metallicity", &m_userDefinedMetallic, 0.0f, 1.0f);
+
 
             ImGui::Checkbox("Use Normal Maps Of the Textures", &m_useNormalMaps);
             ImGui::Checkbox("Use Image Based Lighting", &m_useIBL);
@@ -155,9 +166,9 @@ public:
 
             ImGui::SliderAngle("The Sun's Azimuth", &m_sunAzimuth, 0.0f, 360.0f);
             ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
-            ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 10.0f);
+            ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 5.0f);
             ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
-            ImGui::SliderFloat("The Sun's Distance (Shadow Mapping)",&m_sunDistance, 5.0f, 30.0f);
+            ImGui::SliderFloat("The shininess of the sea",&m_seaShininess, 0.0f, 256.0f);
 
             ImGui::Checkbox("Use a Day and Night System", &m_dayNightSystem);
 
@@ -424,13 +435,24 @@ private:
     PBRMaterial m_mastMaterial = PBRMaterial(RESOURCE_ROOT "resources/materials/bamboo-wood-semigloss-bl/bamboo-wood-semigloss-");
 
     // Tools for the sun
-    float m_sunElevation = 0.0f;
-    float m_sunAzimuth = 0.0f;
-    float m_sunIntensity = 0.0f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
+    float m_sunElevation = glm::radians(50.0f);
+    float m_sunAzimuth = glm::radians(180.f);
+    float m_sunIntensity = 1.5f; // Attenuation with the distance in the PBR shader makes the sun's color turn to zero.
     // Thus, we instead let the user define the intensity of the light instead of a realistic approach.
     glm::vec3 m_lightColor = glm::vec3(1.0f);
     float m_sunDistance = 15.0f;
     bool m_useShadows = false; // Set shadows to false at first.
+    float m_seaShininess = 64.0f;
+    glm::vec3 m_userDefinedkd = glm::vec3(0.0f);
+    glm::vec3 m_userDefinedks = glm::vec3(0.0f);
+    float m_userDefinedShininess = 1.0f;
+
+    glm::vec3 m_userDefinedAlbedo = glm::vec3(0.0f);
+    float m_userDefinedRoughness = 0.5f;
+    float m_userDefinedMetallic = 0.5f;
+    float m_userDefinedAO = 0.5f;
+    bool m_useTextures = false;
+
   
     // Colors for the light of the sun for the "changing lighting conditions" feature
     // We used the color codes given in this forum question: https://community.khronos.org/t/day-night-cycle-light/57752
@@ -490,15 +512,7 @@ private:
         glUniform1f(m_defaultShader.getUniformLocation("interpolationFactor"), interpolationFactor);
         glUniform3fv(m_defaultShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         if (m_dayNightSystem && m_useDirectionalLight) {
-            if (currentTime <= sunsetTime) {
-                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
-            }
-            else if (currentTime <= nightTime){
-                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(eveningSun, nightSun, (currentTime - sunsetTime) / (nightTime - sunsetTime))));
-            }
-            else {
-                glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(nightSun));
-            }
+            determineSunLight(m_defaultShader);
         } else {
             glUniform3fv(m_defaultShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
         }
@@ -507,6 +521,16 @@ private:
         glUniform1i(m_defaultShader.getUniformLocation("useNormalMap"), m_useNormalMaps);
         glUniform1i(m_defaultShader.getUniformLocation("useDirectionalLight"), m_useDirectionalLight);
         glUniform1f(m_defaultShader.getUniformLocation("sunIntensity"), m_sunIntensity);
+        glUniform1i(m_defaultShader.getUniformLocation("useTextures"), m_useTextures);
+
+        glUniform1f(m_defaultShader.getUniformLocation("userDefinedShininess"), m_userDefinedShininess);
+        glUniform1f(m_defaultShader.getUniformLocation("userDefinedMetallic"), m_userDefinedMetallic);
+        glUniform1f(m_defaultShader.getUniformLocation("userDefinedAO"), m_userDefinedAO);
+        glUniform1f(m_defaultShader.getUniformLocation("userDefinedRoughness"), m_userDefinedRoughness);
+        glUniform3fv(m_defaultShader.getUniformLocation("userDefinedks"), 1, glm::value_ptr(m_userDefinedks));
+        glUniform3fv(m_defaultShader.getUniformLocation("userDefinedkd"), 1, glm::value_ptr(m_userDefinedkd));
+        glUniform3fv(m_defaultShader.getUniformLocation("userDefinedAlbedo"), 1, glm::value_ptr(m_userDefinedAlbedo));
+
         if (material != nullptr) {
             GLint textureSlots[] = {
                 GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE5, GL_TEXTURE6
@@ -545,6 +569,18 @@ private:
         mesh.draw(m_shadowShader);
     }
 
+    void determineSunLight(Shader& shader) {
+        if (currentTime <= sunsetTime) {
+                glUniform3fv(shader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(morningSun, eveningSun, currentTime / sunsetTime))); // The final value is the evening sun.
+            }
+            else if (currentTime <= nightTime){
+                glUniform3fv(shader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(eveningSun, nightSun, (currentTime - sunsetTime) / (nightTime - sunsetTime))));
+            }
+            else {
+                glUniform3fv(shader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::mix(nightSun, morningSun, (currentTime - nightTime) / (totalTime - nightTime))));
+         }
+    }
+
     void drawSea(GPUMesh& mesh, const glm::mat4& model) {
 
         const glm::mat4 mvpMatrix = m_projectionMatrix * m_viewMatrix * model;
@@ -571,15 +607,30 @@ private:
         m_environment->bindPrefilteredMap(GL_TEXTURE7);
         m_environment->bindBRDFMap(GL_TEXTURE8);
         m_night.bindPrefilteredMap(GL_TEXTURE10);
+        glActiveTexture(GL_TEXTURE11);
+        glBindTexture(GL_TEXTURE_2D, texShadow);
         glUniform1i(m_seaShader.getUniformLocation("irradianceMap"), 1);
         glUniform1i(m_seaShader.getUniformLocation("prefilteredMap"), 7);
         glUniform1i(m_seaShader.getUniformLocation("prefilteredMapNight"), 10);
+        glUniform1i(m_seaShader.getUniformLocation("shadowMap"), 11);
         glUniform1i(m_seaShader.getUniformLocation("brdfMap"), 8);
         glUniform1i(m_seaShader.getUniformLocation("useIBL"), 1);
         glUniform3fv(m_seaShader.getUniformLocation("lightPosition"), 1, glm::value_ptr(cameraPosition)); // Assume there is a small point light by the camera.
         glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(glm::vec3(1.0f, 1.0f, 1.0f)));
         glUniform3fv(m_seaShader.getUniformLocation("cameraPosition"), 1, glm::value_ptr(cameraPosition));
         glUniform1f(m_seaShader.getUniformLocation("interpolationFactor"), m_dayNightSystem ? interpolationFactor : 0.0f);
+        if (m_dayNightSystem && m_useDirectionalLight) {
+            determineSunLight(m_seaShader);
+        } else {
+            glUniform3fv(m_seaShader.getUniformLocation("lightColor"), 1, glm::value_ptr(m_lightColor));
+        }
+        glUniform3fv(m_seaShader.getUniformLocation("sunDirection"), 1, glm::value_ptr(sunDirection));
+        glUniform1i(m_seaShader.getUniformLocation("useDirectionalLight"), m_useDirectionalLight);
+        glUniform1f(m_seaShader.getUniformLocation("sunIntensity"), m_sunIntensity);
+        glUniformMatrix4fv(m_seaShader.getUniformLocation("lightMVPMatrix"), 1, GL_FALSE, glm::value_ptr(m_lightMVPMatrix));
+        glUniform1i(m_seaShader.getUniformLocation("useShadows"), m_useShadows);
+        glUniform1i(m_seaShader.getUniformLocation("dayNightSystem"), m_dayNightSystem);
+        glUniform1f(m_seaShader.getUniformLocation("shininess"), m_seaShininess);
         mesh.draw(m_seaShader);
     }
 

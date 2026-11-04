@@ -29,6 +29,14 @@ uniform bool dayNightSystem;
 uniform bool useShadows;
 uniform vec3 sunDirection;
 uniform float sunIntensity;
+uniform vec3 userDefinedks;
+uniform vec3 userDefinedkd;
+uniform float userDefinedShininess;
+uniform vec3 userDefinedAlbedo;
+uniform float userDefinedRoughness;
+uniform float userDefinedMetallic;
+uniform float userDefinedAO;
+uniform bool useTextures;
 
 // Texture-based information
 uniform sampler2D textureAlbedo;
@@ -103,21 +111,38 @@ void main()
 
     if (hasTexCoords)       { 
 
-        if (!usePBR) {
-        fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
+        if (!usePBR) { // Apply Lambertian + Blinn-Phong shading if PBR is not used.
+            fragColor = vec4(texture(colorMap, fragTexCoord).rgb, 1);
+            if (useDirectionalLight) {
+                vec3 diffuseColor = userDefinedkd * lightColor * sunIntensity * max(dot(normal, normalize(sunDirection)), 0.0);
+                vec3 halfwayVector = normalize(normalize(cameraPosition - fragPosition) + normalize(sunDirection));
+                vec3 specularColor = userDefinedks * lightColor * sunIntensity * pow(max(dot(normal, halfwayVector), 0.0), userDefinedShininess);
+                fragColor = vec4(diffuseColor + specularColor, 1.0);
+            }
         }
         else {
         // Albedos found online are usually given the sRGB space. To convert
         // them to the linear space, LearnOpenGL mentioned that we need to take its power to 2.2.
-        vec3 albedo = pow(texture(textureAlbedo, fragTexCoord).rgb, vec3(2.2));
-        if (useNormalMap) { // Use the normal map of the texture instead if the user checks the box.
-            normal = texture(textureNormal, fragTexCoord).xyz;
-            normal = normal * 2.0 - 1.0;
-            normal = normalize(fragTBN * normal); 
-        }  
-        float metallic = texture(textureMetallic, fragTexCoord).x;
-        float roughness = texture(textureRoughness, fragTexCoord).x; 
-        float ambientOcclusion = texture(textureAO, fragTexCoord).x;
+        vec3 albedo;
+        float metallic;
+        float roughness;
+        float ambientOcclusion;
+        if (useTextures) {
+            albedo = pow(texture(textureAlbedo, fragTexCoord).rgb, vec3(2.2));
+            if (useNormalMap) { // Use the normal map of the texture instead if the user checks the box.
+                normal = texture(textureNormal, fragTexCoord).xyz;
+                normal = normal * 2.0 - 1.0;
+                normal = normalize(fragTBN * normal); 
+            }  
+            metallic = texture(textureMetallic, fragTexCoord).x;
+            roughness = texture(textureRoughness, fragTexCoord).x; 
+            ambientOcclusion = texture(textureAO, fragTexCoord).x;
+        } else {
+            albedo = userDefinedAlbedo;
+            metallic = userDefinedMetallic;
+            roughness = userDefinedRoughness;
+            ambientOcclusion = userDefinedAO;
+        }
 
         vec3 fragToLight = normalize(lightPosition - fragPosition);
         if (useDirectionalLight) {
