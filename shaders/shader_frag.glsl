@@ -129,7 +129,7 @@ void main()
                 vec3 diffuseColor = userDefinedkd * lightColor * sunIntensity * max(dot(normal, normalize(sunDirection)), 0.0);
                 vec3 halfwayVector = normalize(normalize(cameraPosition - fragPosition) + normalize(sunDirection));
                 vec3 specularColor = userDefinedks * lightColor * sunIntensity * pow(max(dot(normal, halfwayVector), 0.0), userDefinedShininess);
-                fragColor = vec4(diffuseColor + specularColor, 1.0);
+                fragColor = vec4(0.15 * userDefinedkd + diffuseColor + specularColor, 1.0);
             }
         }
         else {

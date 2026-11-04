@@ -125,8 +125,14 @@ public:
             ImGui::Text("The current time is: %f", currentTime); // Use C printf formatting rules (%i is a signed integer)
             ImGui::Checkbox("Use material if no texture", &m_useMaterial);
             ImGui::Checkbox("Wireframe", &m_wireframe);
-            ImGui::Checkbox("Minimap", &m_showMinimap);
+            ImGui::Spacing();
 
+            ImGui::Separator();
+            ImGui::Checkbox("Minimap", &m_showMinimap);
+            
+            ImGui::Spacing();
+            ImGui::Text("Boat Animation");
+            ImGui::Separator();
             ImGui::Checkbox("Animate Boom", &m_animateBoom);
             if (m_animateBoom) {
                 ImGui::SliderFloat("Boom speed (degrees / sec)", &m_boomSpeed, 0.0f, 60.0f);
@@ -149,38 +155,68 @@ public:
                     ImGui::SliderFloat("Speed", &m_bezierSpeed, 0.0f, 1.0f);
                 }
             }
+
+            ImGui::Spacing();
+            ImGui::Separator();
             
+            ImGui::Checkbox("Use Physically Based Rendering", &m_usePBR);
+            ImGui::Separator();
+
+            if (!m_usePBR) {
+            ImGui::Spacing();
+            ImGui::Text("Uniforms if PBR shading is not used");
+            ImGui::Separator();
             ImGui::ColorEdit3("kd", glm::value_ptr(m_userDefinedkd));
             ImGui::ColorEdit3("ks", glm::value_ptr(m_userDefinedks));
             ImGui::SliderFloat("shininess", &m_userDefinedShininess, 0.0f, 256.0f);
+            }
 
+            ImGui::Spacing();
+            ImGui::Separator();
             ImGui::Checkbox("Use Textures", &m_useTextures);
-            ImGui::ColorEdit3("Albedo", glm::value_ptr(m_userDefinedAlbedo));
-            ImGui::SliderFloat("Roughness", &m_userDefinedRoughness, 0.0f, 1.0f);
-            ImGui::SliderFloat("Ambient Occlusion", &m_userDefinedAO, 0.0f, 1.0f);
-            ImGui::SliderFloat("Metallicity", &m_userDefinedMetallic, 0.0f, 1.0f);
+            ImGui::Separator();
 
+            if (!m_useTextures) {
+                ImGui::Spacing();
+                ImGui::Text("Uniforms if textures are not used");
+                ImGui::Separator();
+                ImGui::ColorEdit3("Albedo", glm::value_ptr(m_userDefinedAlbedo));
+                ImGui::SliderFloat("Roughness", &m_userDefinedRoughness, 0.0f, 1.0f);
+                ImGui::SliderFloat("Ambient Occlusion", &m_userDefinedAO, 0.0f, 1.0f);
+                ImGui::SliderFloat("Metallicity", &m_userDefinedMetallic, 0.0f, 1.0f);
+            }
+
+            ImGui::Spacing();
+            ImGui::Separator();
 
             ImGui::Checkbox("Use Normal Maps Of the Textures", &m_useNormalMaps);
             ImGui::Checkbox("Use Image Based Lighting", &m_useIBL);
-            ImGui::Checkbox("Use Physically Based Rendering", &m_usePBR);
-            ImGui::Checkbox("Use the Sun as a Directional Light", &m_useDirectionalLight);
-            ImGui::Checkbox("Cast Shadows from the Sun", &m_useShadows);
-            
-            // In this mathematics forum, I saw that the sun's position is generally coded as an "azimuth" 
-            // and an "elevation". Thus, instead of letting the user set the XYZ coordinates of the sun's direction,
-            // it would be more in line for them to set the azimuth and the elevation and then
-            // calculate the XYZ later. This forum shows how to do it: https://math.stackexchange.com/questions/4697069/calculate-cartesian-angle-from-suns-azimuth-and-elevation
 
-            ImGui::SliderAngle("The Sun's Azimuth", &m_sunAzimuth, 0.0f, 360.0f);
-            ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
-            ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 5.0f);
-            ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
-            ImGui::SliderFloat("The shininess of the sea",&m_seaShininess, 0.0f, 256.0f);
+            ImGui::Spacing();
+            ImGui::Text("Uniforms for the Sun");
+            ImGui::Separator();
+            ImGui::Checkbox("Use the Sun as a Directional Light", &m_useDirectionalLight);
+            if (m_useDirectionalLight) {
+                ImGui::Checkbox("Cast Shadows from the Sun", &m_useShadows);
+                
+                // In this mathematics forum, I saw that the sun's position is generally coded as an "azimuth" 
+                // and an "elevation". Thus, instead of letting the user set the XYZ coordinates of the sun's direction,
+                // it would be more in line for them to set the azimuth and the elevation and then
+                // calculate the XYZ later. This forum shows how to do it: https://math.stackexchange.com/questions/4697069/calculate-cartesian-angle-from-suns-azimuth-and-elevation
+
+                ImGui::SliderAngle("The Sun's Azimuth", &m_sunAzimuth, 0.0f, 360.0f);
+                ImGui::SliderAngle("The Sun's Elevation", &m_sunElevation, 0.0f, 90.0f);
+                ImGui::SliderFloat("The Sun's Intensity", &m_sunIntensity, 0.0f, 5.0f);
+                ImGui::ColorEdit3("The Sun's Color", glm::value_ptr(m_lightColor));
+                ImGui::SliderFloat("The shininess of the sea",&m_seaShininess, 0.0f, 256.0f);
+            }
 
             ImGui::Checkbox("Use a Day and Night System", &m_dayNightSystem);
 
 
+            ImGui::Spacing();
+            ImGui::Text("Camera Controls");
+            ImGui::Separator();
             const char* cameraModes[] = { "Aerial view", "Top view", "Third person" };
             ImGui::Combo("Camera Mode", &m_cameraMode, cameraModes, IM_ARRAYSIZE(cameraModes));
             if (m_cameraMode == Aerial) {
@@ -188,6 +224,10 @@ public:
                 ImGui::SliderFloat("Aerial view Y", &m_aerialY, 0.0f, 5.0f);
                 ImGui::SliderFloat("Aerial view Z", &m_aerialZ, 0.0f, 10.0f);
             }
+
+            ImGui::Spacing();
+            ImGui::Text("Water Controls");
+            ImGui::Separator();
 
             // k = 2 * pi / wavelength, so wavelength cannot be 0
             ImGui::SliderFloat("Amplitude of wave +x+z", &m_amp1, 0.0f, 0.1f);
